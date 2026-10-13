@@ -17,7 +17,9 @@ A plugin for RPG Paper Maker 3.0 that adds Paper Mario-style timing challenges t
 
 Settings are in the plugin's parameter list. See **FULL_INSTRUCTIONS.md** for every setting, skill tag and command.
 
-**Tester.html** (optional): open it in Chrome or Edge, pick your project, and try every character, skill and setting live, then save to the plugin.
+**Online tester:** https://bigwoodart.github.io/RPGPM-Action-Battle-System/Tester.html
+
+**Tester.html** (optional, same page, works offline): open it in Chrome or Edge, pick your project, and try every character, skill and setting live, then save to the plugin.
 
 ## License
 
