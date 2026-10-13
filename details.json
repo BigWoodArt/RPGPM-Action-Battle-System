@@ -713,7 +713,7 @@
 		{
 			"id": 1,
 			"name": "Set enabled",
-			"description": "To turn Action Battle animations off mid-game:\nRun a Command > Structure > Plugin > Set Enabled OFF",
+			"description": "To turn Quick Time Battle off mid-game:\nRun a Command > Structure > Plugin > Set Enabled OFF",
 			"defaultParameters": [
 				{
 					"id": -1,
