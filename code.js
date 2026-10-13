@@ -1,4 +1,4 @@
-// Quick Time Battle v1.0.0 - RPG Paper Maker 3.0 plugin.
+// Quick Time Battle v1.0.1 - RPG Paper Maker 3.0 plugin.
 // Hero attacks and skills run a WASD + Enter quick-time challenge; the grade scales damage.
 // Press any key just before an enemy hit lands to dodge it. See FULL_INSTRUCTIONS.md.
 // Plugins run through `new Function(...)`: no imports. Globals: Common, Core, Data, Manager, Model, Scene.
@@ -929,7 +929,7 @@ class SequenceChallenge extends Challenge {
 		if (this.running && this.t - LEAD_IN >= this.limit) this.resolve(0);
 	}
 	onKey(key) {
-		if (!this.running || KEYS.indexOf(key) === -1) return;
+		if (!this.running || (KEYS.indexOf(key) === -1 && this.seq.indexOf(key) === -1)) return; // WASD, or any key the sequence names
 		if (key === this.seq[this.index]) {
 			// Each correct key is a higher note up a pentatonic-ish scale.
 			tone(440 * Math.pow(2, [0, 2, 4, 7, 9, 12, 14, 16][Math.min(this.index, 7)] / 12), 0.1, this.T.wave, 1);

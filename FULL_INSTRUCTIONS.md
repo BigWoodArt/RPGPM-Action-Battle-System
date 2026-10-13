@@ -118,6 +118,19 @@ For one-off changes, add a **Script** effect to the skill (Skills > Effects) and
 **Set enabled** - to turn the plugin off mid-game (for cutscene battles): Run a Command > Structure > Plugin >
 Quick Time Battle > Set enabled, value OFF. Set it back to ON afterwards. This stops both the challenges and the dodge.
 
+## Tester
+
+`Tester.html` runs the plugin's real `code.js` on a mock battle. It changes nothing until you save.
+
+1. Open `Tester.html` in Chrome or Edge. Click **Open project folder** and pick your RPG Paper Maker project folder (the one with `heroes.json`). Browsers cannot look up folders on their own, so this is asked once; after that the tester reconnects by itself (or with one click).
+2. **What to test**: pick a Character (fills their class, which you can change), then a Skill / action. Skills come from your project, including Run on Attack, element and any `// qtb` tag. It shows which table entry the challenge comes from.
+3. **Challenge for this target**: change type, theme and numbers with sliders. Choose whether the change applies to the skill, the hero, the class or everything. The stage re-runs on each change.
+4. Press **Run challenge** (or click the stage and use W A S D / Enter). **Dodge test** runs an enemy attack against your dodge settings.
+5. Other settings are in the sections below. Ranged Hero slots: enter the hero ID the variable holds, then test a skill with Run on Attack.
+6. **Save to plugin** writes `details.json` and keeps `details.backup.json`. Then close the plugin window in the editor without pressing OK, reopen it, and restart the engine.
+
+Without Chrome or Edge, use **Load details.json** and **Download details.json** instead (IDs are typed in).
+
 ## Notes
 
 - Enemy attacks are never challenges; they use the dodge.
