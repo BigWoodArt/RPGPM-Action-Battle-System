@@ -21,6 +21,10 @@ Settings are in the plugin's parameter list. See **FULL_INSTRUCTIONS.md** for ev
 
 **Tester.html** (optional, same page, works offline): open it in Chrome or Edge, pick your project, and try every character, skill and setting live, then save to the plugin.
 
+## Updating
+
+Your settings are stored in `details.json`. When updating, copy over `code.js` (and the docs and Tester) but **keep your own `details.json`**. Replacing it resets every setting to the defaults. The `update-only` zip leaves it out.
+
 ## License
 
 MIT (c) Wood (Skinnywoodplank). See LICENSE.

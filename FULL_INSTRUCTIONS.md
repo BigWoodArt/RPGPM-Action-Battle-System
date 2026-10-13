@@ -139,6 +139,10 @@ The last change wins when two places set the same skill. The tester warns before
 
 Without Chrome or Edge, use **Load details.json** and **Download details.json** instead (IDs are typed in).
 
+## Updating
+
+Settings live in `details.json`, so copying a whole new folder over yours resets them. To update safely, replace only `code.js` (and `Tester.html`, `README.md`, `FULL_INSTRUCTIONS.md`). If a new version adds settings, open the plugin window or the Tester: missing settings use their defaults. The Tester saves a `details.backup.json` before each save.
+
 ## Notes
 
 - Enemy attacks are never challenges; they use the dodge.
