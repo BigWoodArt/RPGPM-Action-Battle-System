@@ -53,6 +53,11 @@ canvas:focus{border-color:var(--acc)}
 .sech{font-weight:700;font-size:14px}
 .skills{max-height:200px;overflow:auto;margin-top:6px;display:flex;flex-direction:column;gap:2px}
 .sk{text-align:left;border-radius:4px;padding:3px 8px}.sk.on{background:var(--acc);color:#2a2036;border-color:var(--acc)}
+.modal{position:fixed;inset:0;background:rgba(0,0,0,.65);display:flex;align-items:center;justify-content:center;z-index:50}
+.modal>div{background:var(--panel);border:2px solid var(--acc);border-radius:10px;padding:18px 22px;max-width:520px}
+.modal h2{margin:0 0 8px;font-size:17px}.modal ol{padding-left:20px;margin:8px 0 14px}.modal li{margin:6px 0}
+.welcome{padding:6px 4px}.welcome h2{margin:4px 0 8px}.welcome ol{padding-left:20px}.welcome li{margin:8px 0}
+.welcome .big{font-size:15px;padding:10px 18px;margin:8px 0}.warn{color:var(--bad)}
 </style>
 </head>
 <body>
@@ -60,6 +65,8 @@ canvas:focus{border-color:var(--acc)}
 	<h1>Quick Time Battle Tester</h1>
 	<button id="btnOpen" class="pri">Open project folder</button>
 	<button id="btnReconnect" style="display:none">Reconnect</button>
+	<button id="btnUndo" disabled title="Undo the last change (Ctrl+Z)">↶ Undo</button>
+	<button id="btnRevert" title="Throw away all unsaved changes">Revert</button>
 	<button id="btnSave" disabled>Save to plugin</button>
 	<button id="btnLoadFile" title="Load a details.json file">Load details.json…</button>
 	<button id="btnDownload" title="Download the edited details.json">Download details.json</button>
@@ -78,7 +85,7 @@ canvas:focus{border-color:var(--acc)}
 		<label>Stage <select id="size"><option value="960x540">960×540</option><option value="1280x720" selected>1280×720</option><option value="1600x900">1600×900</option><option value="1920x1080">1920×1080</option></select></label>
 		<label id="previewWrap" style="display:none">Preview skill <select id="previewSkill"></select></label>
 		<label>Enemies <select id="nEnemies"><option>1</option><option>2</option><option>3</option></select></label>
-		<span class="hint" style="margin:0">Keys: W A S D and Enter (click the stage first)</span>
+		<span class="hint" style="margin:0">Click the stage, then press W A S D / Enter</span>
 	</div>
 	<div id="result"></div>
 	<div id="runup" class="hint"></div>
@@ -131,10 +138,36 @@ function loadDetails(obj, text) {
 }
 function setParam(name, v) {
 	const p = S.params.get(name); if (!p) return;
+	snap();
 	p.v = coerce(p.k, v);
 	S.dirty = true; updateHeader(); scheduleRerun();
 }
 const P = name => S.params.get(name);
+
+// ------------------------------------------------------------ undo
+S.undo = []; S.lastSnap = 0; S.confirmed = {};
+function snap() { // one snapshot per burst of edits (a slider drag is one step)
+	const now = performance.now();
+	if (now - S.lastSnap > 700) {
+		S.undo.push(new Map([...S.params].map(([n, p]) => [n, p.v])));
+		if (S.undo.length > 60) S.undo.shift();
+		$("btnUndo").disabled = false;
+	}
+	S.lastSnap = now;
+}
+function undo() {
+	const m = S.undo.pop(); if (!m) return;
+	for (const [n, v] of m) { const p = S.params.get(n); if (p) p.v = v; }
+	S.lastSnap = 0; S.dirty = true; $("btnUndo").disabled = !S.undo.length;
+	updateHeader(); renderSide(); if (S.db) applyPreview(); scheduleRerun();
+}
+function modal(title, nodes) {
+	const m = el("div", { className: "modal" }), box = el("div");
+	const ok = el("button", { className: "pri", textContent: "Got it" });
+	ok.onclick = () => m.remove();
+	box.append(el("h2", { textContent: title }), ...nodes, ok);
+	m.append(box); document.body.append(m); ok.focus();
+}
 function jsonOf(name, fb) { try { const p = P(name); return p && p.v.trim() ? JSON.parse(p.v) : fb; } catch (e) { return fb; } }
 
 function serialize() {
@@ -492,6 +525,7 @@ function getAt(path) {
 	return o;
 }
 function setAt(path, val) {
+	snap();
 	let root = jsonOf(path[0], path.length === 1 ? undefined : {});
 	if (path.length === 1) root = val;
 	else {
@@ -832,7 +866,7 @@ function slotValue(slot) {
 }
 function setSlot(slot, def) {
 	for (const p of slot.paths) {
-		if (p[0] === "Default Challenge") { P(p[0]).v = JSON.stringify(def === undefined ? { type: "timing" } : clone(def)); S.dirty = true; updateHeader(); }
+		if (p[0] === "Default Challenge") { snap(); P(p[0]).v = JSON.stringify(def === undefined ? { type: "timing" } : clone(def)); S.dirty = true; updateHeader(); }
 		else setAt(p, clone(def));
 	}
 }
@@ -853,6 +887,23 @@ function initSame() {
 		const v = slotValue(slot), a = slotValue(slotFor(aboveOf(id)));
 		S.same[id] = v.state === "same" && a.state === "same" && JSON.stringify(v.def) === JSON.stringify(a.def);
 	}
+}
+
+// ---- warnings before a change touches other settings
+function guardClass() {
+	const w = S.who, key = "c" + w.cls; if (S.confirmed.class === key) return true;
+	const n = learnIds(w.cls).filter(id => getAt(["Skill Challenges", String(id)]) !== undefined).length;
+	if (n === 0) return true;
+	if (!confirm(n + " of this class's skills have their own setting (Skills tab).\nA class setting overrides those for this class. Continue?")) return false;
+	S.confirmed.class = key; return true;
+}
+function guardSkill(id) {
+	if (S.confirmed.skill === id) return true;
+	let n = 0;
+	for (const param of ["Hero Challenges", "Class Challenges"]) for (const v of Object.values(jsonOf(param, {}))) if (v && v.skills && v.skills[String(id)] !== undefined) n++;
+	if (n === 0) return true;
+	if (!confirm(n + " character/class setting(s) for this skill will be replaced by this skill's own setting. Continue?")) return false;
+	S.confirmed.skill = id; return true;
 }
 
 // ---- stage follows the active section
@@ -933,11 +984,12 @@ function renderSection(id) {
 	host.className = "sec" + (S.active === id ? " active" : "");
 	const { t, s } = secTitle(id), val = slotValue(slot);
 	host.append(el("div", { className: "sech", textContent: t }), el("div", { className: "hint", textContent: s }));
+	if (id === "class") host.append(el("div", { className: "hint", textContent: "Changing this sets every skill the class learns." }));
 	const above = id === "char" ? null : secTitle(aboveOf(id)).t;
 	let same = false;
 	if (above) {
 		const cb = el("input", { type: "checkbox", checked: !!S.same[id] });
-		cb.onchange = () => { S.same[id] = cb.checked; if (cb.checked) { syncSame(); refreshAll(); scheduleRerun(); } else renderSection(id); };
+		cb.onchange = () => { if (cb.checked && id === "class" && !guardClass()) { cb.checked = false; return; } S.same[id] = cb.checked; if (cb.checked) { syncSame(); refreshAll(); scheduleRerun(); } else renderSection(id); };
 		host.append(el("div", { className: "row wide" }, cb, el("label", { textContent: "Same as " + above })));
 		same = !!S.same[id];
 	}
@@ -947,6 +999,7 @@ function renderSection(id) {
 	sel.disabled = same || val.state === "empty";
 	sel.onchange = () => {
 		const v = sel.value; if (v === "mixed") return;
+		if (id === "class" && !guardClass()) { renderSection(id); return; }
 		setSlot(slot, v === "default" ? undefined : v === "none" ? false : { type: v });
 		syncSame(); refreshAll(); scheduleRerun();
 	};
@@ -955,12 +1008,12 @@ function renderSection(id) {
 	if (val.state === "default" && inh) host.append(el("div", { className: "hint", textContent: "Right now: " + inh }));
 	if (val.state === "mixed") {
 		const b = el("button", { className: "sm", textContent: "Make them all the same (first one wins)" });
-		b.onclick = () => { const first = getAt(slot.paths[0]); setSlot(slot, first); syncSame(); refreshAll(); scheduleRerun(); };
+		b.onclick = () => { if (id === "class" && !guardClass()) return; const first = getAt(slot.paths[0]); setSlot(slot, first); syncSame(); refreshAll(); scheduleRerun(); };
 		host.append(el("div", { className: "hint", textContent: val.n + " skill(s) have their own setting (see the Skills tab)." }), b);
 	}
 	if (val.state === "same" && !same && val.def && typeof val.def === "object") {
 		const cur = val.def;
-		const upd = (rerender) => { setSlot(slot, cur); syncSame(); for (const o of ["char", "class", "extra"]) if (o !== id) renderSection(o); if (rerender) renderSection(id); scheduleRerun(); };
+		const upd = (rerender) => { if (id === "class" && !guardClass()) { renderSection(id); return; } setSlot(slot, cur); syncSame(); for (const o of ["char", "class", "extra"]) if (o !== id) renderSection(o); if (rerender) renderSection(id); scheduleRerun(); };
 		const themeSel = el("select");
 		themeSel.append(el("option", { value: "", textContent: "auto (from skill element)" }));
 		for (const k of THEME_LIST) themeSel.append(el("option", { value: k, textContent: k }));
@@ -1037,16 +1090,16 @@ function renderSkillTab(side) {
 		box.append(el("div", { className: "sech", textContent: info.name }),
 			el("div", { className: "hint", textContent: (info.damaging ? "Damages / heals" : "No damage (buff / status)") + " · Element: " + (info.element ? (elemName || "#" + info.element) : "none") + " · Look when auto: " + autoTheme(info) + (info.runOn ? " · Run on Attack" : "") + (info.tag ? " · tag: " + info.tag : "") }));
 		const sel = gameSelect(state, cur0, { defaultLabel: "Default (inherit)" });
-		const apply = def => { setAt(path, clone(def)); clearHigher(id); };
+		const apply = def => { if (!guardSkill(id)) return false; setAt(path, clone(def)); clearHigher(id); return true; };
 		sel.onchange = () => {
 			const v = sel.value;
-			apply(v === "default" ? undefined : v === "none" ? false : { type: v });
-			render(); scheduleRerun();
+			if (apply(v === "default" ? undefined : v === "none" ? false : { type: v })) scheduleRerun();
+			render();
 		};
 		box.append(el("div", { className: "row" }, el("label", { textContent: "Minigame" }), sel));
 		if (state === "default") box.append(el("div", { className: "hint", textContent: "Right now: " + inheritText(id) }));
 		if (cur0 && typeof cur0 === "object") {
-			const cur = cur0, upd = () => { apply(cur); scheduleRerun(); };
+			const cur = cur0, upd = () => { if (apply(cur)) scheduleRerun(); else render(); };
 			fieldsInto(box, cur, upd);
 			const ts = el("select");
 			ts.append(el("option", { value: "", textContent: "auto (" + autoTheme(info) + ")" }));
@@ -1058,7 +1111,7 @@ function renderSkillTab(side) {
 			const ts = el("select");
 			ts.append(el("option", { value: "", textContent: "auto (" + autoTheme(info) + ")" }));
 			for (const k of THEME_LIST) ts.append(el("option", { value: k, textContent: k }));
-			ts.onchange = () => { if (!ts.value) return; const t = tFor(id), lv = resolveLevel(t), d = lv ? getAt(pathFor(lv, t)) : undefined; apply(Object.assign({}, d && typeof d === "object" ? clone(d) : { type: "timing" }, { theme: ts.value })); render(); scheduleRerun(); };
+			ts.onchange = () => { if (!ts.value) return; const t = tFor(id), lv = resolveLevel(t), d = lv ? getAt(pathFor(lv, t)) : undefined; if (apply(Object.assign({}, d && typeof d === "object" ? clone(d) : { type: "timing" }, { theme: ts.value }))) scheduleRerun(); render(); };
 			box.append(el("div", { className: "row" }, el("label", { textContent: "Look" }), ts));
 		}
 		box.append(el("div", { className: "hint", textContent: "Applies to every character and class. Per-character settings for this skill are replaced when you change it." }));
@@ -1071,7 +1124,7 @@ function renderSkillTab(side) {
 		const ts = el("select");
 		for (const k of THEME_LIST) ts.append(el("option", { value: k, textContent: k }));
 		ts.value = map[e.id] || "plain";
-		ts.onchange = () => { const m = jsonOf("Element Themes", {}); m[e.id] = ts.value; P("Element Themes").v = JSON.stringify(m); S.dirty = true; updateHeader(); scheduleRerun(); };
+		ts.onchange = () => { snap(); const m = jsonOf("Element Themes", {}); m[e.id] = ts.value; P("Element Themes").v = JSON.stringify(m); S.dirty = true; updateHeader(); scheduleRerun(); };
 		eb.append(el("div", { className: "row" }, el("label", { textContent: e.name }), ts));
 	}
 	const det = el("details"); det.dataset.k = "elooks";
@@ -1079,8 +1132,25 @@ function renderSkillTab(side) {
 	side.append(det);
 }
 
+function renderWelcome() {
+	const side = $("side"); side.textContent = "";
+	const w = el("div", { className: "welcome" });
+	w.append(el("h2", { textContent: "Welcome" }),
+		el("div", { textContent: "Try the quick-time minigames for your own heroes and skills, tune them, and save the settings into the plugin." }),
+		el("ol", {}, el("li", { textContent: "Click the button and choose your RPG Paper Maker project folder (the one that contains heroes.json and Plugins)." }),
+			el("li", { textContent: "Pick a character on the left. Choose a minigame for them, their class and their other skills." }),
+			el("li", { textContent: "Watch it run on the right. Click the stage, then use W A S D and Enter." }),
+			el("li", { textContent: "Press Save to plugin when you like it." })));
+	const b = el("button", { className: "pri big", textContent: "Open project folder" });
+	b.onclick = () => $("btnOpen").click();
+	w.append(b);
+	if (!window.showDirectoryPicker) w.append(el("div", { className: "warn", textContent: "This browser can't open folders. Open this page in Chrome or Edge, or use “Load details.json…” above." }));
+	else w.append(el("div", { className: "hint", textContent: "Needs Chrome or Edge. Your files stay on your computer." }));
+	side.append(w);
+}
 function renderSide() {
 	const tabs = $("tabs"); tabs.textContent = "";
+	if (!S.db && !S.dir && !S.fileLoaded) { tabs.style.display = "none"; fillPreviewPicker(); return renderWelcome(); }
 	if (!S.db) { tabs.style.display = "none"; fillPreviewPicker(); return renderLegacySide("all"); }
 	tabs.style.display = "";
 	for (const [k, label] of [["char", "Characters"], ["skill", "Skills"], ["settings", "Settings"]]) {
@@ -1091,7 +1161,16 @@ function renderSide() {
 	const side = $("side"), scroll = side.parentNode.scrollTop; side.textContent = "";
 	if (S.tab === "char") renderCharTab(side);
 	else if (S.tab === "skill") renderSkillTab(side);
-	else renderLegacySide("settings");
+	else {
+		renderLegacySide("settings");
+		const rb = el("button", { textContent: "Reset all settings to the defaults", style: "margin:6px 0 16px" });
+		rb.onclick = () => {
+			if (!confirm("Reset EVERY setting (including your minigame choices) to the plugin defaults? You can still Undo.")) return;
+			snap(); for (const e of EMBED_DETAILS.parameters) { const p = S.params.get(e.name); if (p) p.v = coerce(e.defaultValue.k, e.defaultValue.v); }
+			S.dirty = true; updateHeader(); renderSide(); scheduleRerun();
+		};
+		side.append(rb);
+	}
 	fillPreviewPicker();
 	side.parentNode.scrollTop = scroll;
 }
@@ -1149,6 +1228,14 @@ $("btnReconnect").onclick = async () => {
 	const h = await idbGet("dir"); if (!h) return;
 	try { if ((await h.requestPermission({ mode: "readwrite" })) === "granted") { await attach(h); $("btnReconnect").style.display = "none"; } } catch (e) { console.error(e); }
 };
+$("btnUndo").onclick = undo;
+$("btnRevert").onclick = () => {
+	if (!S.dirty) return;
+	if (!confirm("Throw away all unsaved changes?")) return;
+	snap(); const obj = JSON.parse(S.detailsText || JSON.stringify(EMBED_DETAILS)); const sel = S.db;
+	loadDetails(obj, S.detailsText); S.dirty = false; updateHeader(); renderSide(); if (sel) applyPreview(); scheduleRerun();
+};
+window.addEventListener("keydown", e => { if ((e.ctrlKey || e.metaKey) && e.key === "z" && !/^(input|textarea)$/i.test(e.target.tagName)) { e.preventDefault(); undo(); } });
 $("btnSave").onclick = async () => {
 	if (!S.dir) return;
 	try {
@@ -1161,17 +1248,24 @@ $("btnSave").onclick = async () => {
 		const w = await (await S.dir.getFileHandle("details.json", { create: true })).createWritable();
 		await w.write(text); await w.close();
 		S.detailsText = text; S.dirty = false; updateHeader();
-		setStatus("Saved details.json (backup: details.backup.json). Close the plugin window in the editor and reopen it without pressing OK, then restart the engine.");
+		setStatus("Saved details.json (backup: details.backup.json).");
+		modal("Saved", [el("div", { textContent: "The plugin settings are written. To use them in your game:" }),
+			el("ol", {}, el("li", { textContent: "If the Quick Time Battle plugin window is open in RPG Paper Maker, close it WITHOUT pressing OK. Pressing OK would overwrite what you just saved." }),
+				el("li", { textContent: "Reopen the project in the editor if it was already open (so it reads the new settings)." }),
+				el("li", { textContent: "Start the game." })),
+			el("div", { className: "hint", textContent: "A copy of your old settings is in details.backup.json." })]);
 	} catch (e) { alert("Save failed: " + e.message); }
 };
 $("btnDownload").onclick = () => {
 	const a = el("a", { href: URL.createObjectURL(new Blob([serialize()], { type: "application/json" })), download: "details.json" });
 	document.body.append(a); a.click(); a.remove();
+	modal("Downloaded", [el("ol", {}, el("li", { textContent: "Put the downloaded details.json into Plugins/Quick Time Battle in your project, replacing the old one." }),
+		el("li", { textContent: "If the plugin window is open in RPG Paper Maker, close it without pressing OK, then start the game." }))]);
 };
 $("btnLoadFile").onclick = () => $("fileIn").click();
 $("fileIn").onchange = async () => {
 	const f = $("fileIn").files[0]; if (!f) return;
-	try { const text = await f.text(); loadDetails(JSON.parse(text), text); S.dir = null; setStatus("Loaded " + f.name + " (not linked to a folder: use Download)"); updateHeader(); renderSide(); scheduleRerun(); }
+	try { const text = await f.text(); loadDetails(JSON.parse(text), text); S.dir = null; S.fileLoaded = true; setStatus("Loaded " + f.name + " (not linked to a folder: use Download)"); updateHeader(); renderSide(); scheduleRerun(); }
 	catch (e) { alert("Not a valid details.json: " + e.message); }
 	$("fileIn").value = "";
 };

@@ -133,7 +133,9 @@ Quick Time Battle > Set enabled, value OFF. Set it back to ON afterwards. This s
 5. **Settings tab**: every other plugin setting. Ranged Hero slots: enter the hero ID the variable holds, then preview a skill with Run on Attack.
 6. **Save to plugin** writes `details.json` and keeps `details.backup.json`. Then close the plugin window in the editor without pressing OK, reopen it, and restart the engine.
 
-The last change wins when two places set the same skill.
+The last change wins when two places set the same skill. The tester warns before a change overrides other settings.
+
+**Undo** (or Ctrl+Z) steps back one change. **Revert** drops all unsaved changes. The Settings tab has **Reset all settings to the defaults**; Undo still works after it.
 
 Without Chrome or Edge, use **Load details.json** and **Download details.json** instead (IDs are typed in).
 
