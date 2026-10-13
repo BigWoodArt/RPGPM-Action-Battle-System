@@ -27,6 +27,7 @@ MIT (c) Wood (Skinnywoodplank). See LICENSE.
 
 ## Changelog
 
+- 1.0.2 Confused heroes attacking a teammate get no challenge.
 - 1.0.1 Key sequences accept any key named in the sequence (e.g. Z, Y, X). Tester.html added.
 - 1.0.0 Release cleanup, full instructions, generic default tables.
 - 0.10.9 Ranged heroes also match the variable's instance ID.

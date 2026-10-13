@@ -142,5 +142,6 @@ Without Chrome or Edge, use **Load details.json** and **Download details.json** 
 ## Notes
 
 - Enemy attacks are never challenges; they use the dodge.
+- A confused hero who attacks a teammate gets no challenge (no bonus damage to allies). Healing skills aimed at allies still get one.
 - A hero set as ranged still plays their normal attack animation, just without running to the enemy.
 - If something looks wrong, turn on **Debug** and check `Saves/qtb-log.json`.

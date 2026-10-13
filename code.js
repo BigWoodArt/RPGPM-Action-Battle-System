@@ -1,4 +1,4 @@
-// Quick Time Battle v1.0.1 - RPG Paper Maker 3.0 plugin.
+// Quick Time Battle v1.0.2 - RPG Paper Maker 3.0 plugin.
 // Hero attacks and skills run a WASD + Enter quick-time challenge; the grade scales damage.
 // Press any key just before an enemy hit lands to dodge it. See FULL_INSTRUCTIONS.md.
 // Plugins run through `new Function(...)`: no imports. Globals: Common, Core, Data, Manager, Model, Scene.
@@ -1349,14 +1349,14 @@ function posOf(battler, w, h, fallbackX, fallbackY) {
 // Returns { skillId, hasDamage, element, name } or null when this action takes no challenge.
 function describeAction(battle) {
 	const K = Common.EFFECT_SPECIAL_ACTION_KIND;
-	const fromContent = c => ({ skillId: c.id, hasDamage: hasDamageEffect(c), element: elementOf(c), name: nameOf(c), tag: tagOf(c), firstIsDamage: c.getEffects()[0] && c.getEffects()[0].kind === Common.EFFECT_KIND.DAMAGES });
+	const fromContent = c => ({ skillId: c.id, hasDamage: hasDamageEffect(c), element: elementOf(c), name: nameOf(c), tag: tagOf(c), firstIsDamage: c.getEffects()[0] && c.getEffects()[0].kind === Common.EFFECT_KIND.DAMAGES, targetKind: c.targetKind });
 	try {
 		switch (battle.battleCommandKind) {
 			case K.APPLY_WEAPONS:
 				{
-				let tag;
-				try { tag = tagOf(Data.Skills.get(1)); } catch (e) { /* ignore */ }
-				return { skillId: 1, hasDamage: true, element: null, name: "", tag, firstIsDamage: true };
+				let tag, targetKind;
+				try { const s1 = Data.Skills.get(1); tag = tagOf(s1); targetKind = s1.targetKind; } catch (e) { /* ignore */ }
+				return { skillId: 1, hasDamage: true, element: null, name: "", tag, firstIsDamage: true, targetKind };
 			}
 			case K.OPEN_SKILLS:
 				return fromContent(battle.battleStartTurn.active
@@ -1369,6 +1369,20 @@ function describeAction(battle) {
 		console.warn("[QTB] could not resolve action", e);
 	}
 	return null;
+}
+
+// A confused hero hitting a teammate gets no challenge, so a bonus never lands on an ally.
+// True when an enemy-type action is aimed at heroes, or the user is under "attack a random ally".
+function hitsOwnTeam(battle, info) {
+	try {
+		const H = Common.CHARACTER_KIND.HERO, TK = Common.TARGET_KIND || {};
+		const targets = battle.targets || [];
+		const onAllies = targets.length > 0 && targets.every(t => t.player && t.player.kind === H);
+		if (onAllies && info.targetKind !== undefined && (info.targetKind === TK.ENEMY || info.targetKind === TK.ALL_ENEMIES)) return true;
+		const R = Common.STATUS_RESTRICTIONS_KIND;
+		if (info.hasDamage && R && battle.user.containsRestriction(R.ATTACK_RANDOM_ALLY)) return true;
+	} catch (e) { /* ignore */ }
+	return false;
 }
 
 // ---------------------------------------------------------------- hooks
@@ -1412,6 +1426,10 @@ BA.initialize = function () {
 	qte = null;
 	if (enabled && isHeroAction(this.battle)) {
 		const info = describeAction(this.battle);
+		if (info && hitsOwnTeam(this.battle, info)) {
+			blog("hero attacks an ally (confused): no challenge", { skillId: info.skillId });
+			return callInitialize(this);
+		}
 		if (info) {
 			const player = this.battle.user.player;
 			let classId = null;
