@@ -46,6 +46,13 @@ canvas:focus{border-color:var(--acc)}
 .mults span{font-size:11px;color:var(--dim);display:block}
 .src{padding:5px 8px;background:var(--panel2);border-radius:6px;margin:6px 0}
 @media(max-width:900px){main{grid-template-columns:1fr;height:auto}aside{border-right:0}}
+.tab{border-radius:6px 6px 0 0;padding:6px 14px}.tab.on{background:var(--acc);color:#2a2036;font-weight:700;border-color:var(--acc)}
+#tabs{display:flex;gap:4px;margin-bottom:8px}
+.box,.sec{background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:8px 10px;margin-bottom:8px}
+.sec.active{border-color:var(--acc);box-shadow:0 0 0 1px var(--acc) inset}
+.sech{font-weight:700;font-size:14px}
+.skills{max-height:200px;overflow:auto;margin-top:6px;display:flex;flex-direction:column;gap:2px}
+.sk{text-align:left;border-radius:4px;padding:3px 8px}.sk.on{background:var(--acc);color:#2a2036;border-color:var(--acc)}
 </style>
 </head>
 <body>
@@ -61,7 +68,7 @@ canvas:focus{border-color:var(--acc)}
 	<input id="fileIn" type="file" accept=".json,application/json" hidden>
 </header>
 <main>
-<aside id="side"></aside>
+<aside><div id="tabs"></div><div id="side"></div></aside>
 <section class="stage">
 	<canvas id="cv" width="1280" height="720" tabindex="0"></canvas>
 	<div class="bar">
@@ -69,6 +76,7 @@ canvas:focus{border-color:var(--acc)}
 		<button id="btnDodge">Dodge test</button>
 		<label><input type="checkbox" id="auto" checked> Re-run on change</label>
 		<label>Stage <select id="size"><option value="960x540">960×540</option><option value="1280x720" selected>1280×720</option><option value="1600x900">1600×900</option><option value="1920x1080">1920×1080</option></select></label>
+		<label id="previewWrap" style="display:none">Preview skill <select id="previewSkill"></select></label>
 		<label>Enemies <select id="nEnemies"><option>1</option><option>2</option><option>3</option></select></label>
 		<span class="hint" style="margin:0">Keys: W A S D and Enter (click the stage first)</span>
 	</div>
@@ -460,8 +468,7 @@ const TYPE_FIELDS = {
 const THEME_LIST = ["plain", "fire", "lightning", "ice", "water", "earth", "wind", "light", "heal", "shadow"];
 
 // Location of a challenge entry in the JSON tables: [parameter, ...keys]
-function pathFor(level) {
-	const t = S.test;
+function pathFor(level, t = S.test) {
 	switch (level) {
 		case "global": return ["Default Challenge"];
 		case "skill": return ["Skill Challenges", String(t.skill)];
@@ -473,11 +480,12 @@ function pathFor(level) {
 }
 const LEVEL_KEYS = ["global", "skill", "heroSkill", "classSkill", "heroDefault", "classDefault"];
 const dbName = (list, id, fb) => { const x = S.db && S.db[list].find(o => o.id === id); return x ? x.name : fb + " " + id; };
-const LEVEL_NAMES = new Proxy({}, { get(_, k) {
-	const t = S.test, h = dbName("heroes", t.hero, "Hero"), c = dbName("classes", t.cls, "Class"), sk = dbName("skills", t.skill, "Skill");
+function levelName(k, t = S.test) {
+	const h = t.hero > 0 ? dbName("heroes", t.hero, "Hero") : "Everyone", c = dbName("classes", t.cls, "Class"), sk = dbName("skills", t.skill, "Skill");
 	return { global: "Everything (Default Challenge)", skill: sk + ", any hero", heroSkill: h + " + " + sk, classSkill: c + " class + " + sk,
 		heroDefault: h + ": all skills", classDefault: c + " class: all skills" }[k];
-}, ownKeys() { return LEVEL_KEYS; }, getOwnPropertyDescriptor() { return { enumerable: true, configurable: true }; } });
+}
+const LEVEL_NAMES = new Proxy({}, { get(_, k) { return levelName(k); }, ownKeys() { return LEVEL_KEYS; }, getOwnPropertyDescriptor() { return { enumerable: true, configurable: true }; } });
 function getAt(path) {
 	let o = jsonOf(path[0], undefined);
 	for (let i = 1; i < path.length && o !== undefined && o !== null; i++) o = o[path[i]];
@@ -496,8 +504,7 @@ function setAt(path, val) {
 	P(path[0]).v = JSON.stringify(root === undefined ? {} : root);
 	S.dirty = true; updateHeader();
 }
-function resolveLevel() {
-	const t = S.test;
+function resolveLevel(t = S.test) {
 	const hero = jsonOf("Hero Challenges", {})[t.hero], cls = jsonOf("Class Challenges", {})[t.cls], sk = jsonOf("Skill Challenges", {});
 	if (hero && hero.skills && hero.skills[t.skill] !== undefined) return "heroSkill";
 	if (cls && cls.skills && cls.skills[t.skill] !== undefined) return "classSkill";
@@ -690,16 +697,17 @@ function control(def) {
 	return wrap;
 }
 
-function renderSide() {
+function renderLegacySide(part) {
 	const open = new Set([...document.querySelectorAll("#side details[open]")].map(d => d.dataset.k));
 	if (!$("side").children.length) open.add("test").add("editor").add("Rules");
-	const side = $("side"); const scroll = side.scrollTop;
+	const side = $("side"); const scroll = side.parentNode.scrollTop;
 	side.textContent = "";
 	const mk = (key, title, body) => {
 		const d = el("details", { open: open.has(key) }); d.dataset.k = key;
 		d.append(el("summary", { textContent: title }), body); side.append(d);
 	};
 
+	if (part !== "settings") {
 	// test target
 	const t = S.test, tb = el("div");
 	const num = (key, label, min, w) => {
@@ -754,6 +762,7 @@ function renderSide() {
 	mk("test", "1. What to test", tb);
 
 	mk("editor", "2. Challenge for this target", el("div", { id: "editor" }));
+	}
 
 	for (const [group, items] of SCHEMA) {
 		const body = el("div");
@@ -783,7 +792,308 @@ function renderSide() {
 		mk("other", "Other settings", body);
 	}
 	renderEditor(); updateResolveInfo();
-	side.scrollTop = scroll;
+	side.parentNode.scrollTop = scroll;
+}
+
+// ------------------------------------------------------------ guided editor (project loaded)
+Object.assign(S, { tab: "char", who: { hero: 0, cls: 0 }, active: "char", sel: {}, same: {}, skillSel: 1, skillFilter: "" });
+const clone = v => v === undefined ? undefined : JSON.parse(JSON.stringify(v));
+const learnIds = cls => { const c = S.db.classes.find(o => o.id === cls); return ((c && c.raw.skills) || []).map(x => x.id).filter(id => id !== 1); };
+const skillById = id => S.db.skills.find(o => o.id === id);
+const infoOf = id => { const sk = skillById(id); return sk ? skillInfo(sk) : { name: "Skill " + id, damaging: true, element: 0, runOn: false, tag: "" }; };
+const heroClass = id => { const h = S.db.heroes.find(o => o.id === id); return (h && h.raw.class) || 0; };
+function tFor(skillId) { return { hero: S.who.hero, cls: S.who.cls || heroClass(S.who.hero), skill: skillId, damaging: infoOf(skillId).damaging }; }
+const typeName = d => d === false ? "no minigame" : ((d && d.type) || "timing");
+function inheritText(sample) {
+	const t = tFor(sample), lv = resolveLevel(t);
+	return lv ? typeName(getAt(pathFor(lv, t))) + " (" + levelName(lv, t) + ")" : "no minigame";
+}
+
+// A slot is the set of table entries one section controls.
+function slotFor(sec) {
+	const w = S.who, D = S.db;
+	if (sec === "char") return { paths: [w.hero > 0 ? ["Hero Challenges", String(w.hero), "skills", "1"] : ["Skill Challenges", "1"]], samples: [1] };
+	if (sec === "class") {
+		if (!(w.cls > 0)) return null;
+		const ids = learnIds(w.cls);
+		return { paths: ids.map(id => ["Class Challenges", String(w.cls), "skills", String(id)]), samples: ids.filter(id => infoOf(id).damaging).concat(ids.filter(id => !infoOf(id).damaging)) };
+	}
+	const learn = new Set(w.cls > 0 ? learnIds(w.cls) : []);
+	return { paths: [w.hero > 0 ? ["Hero Challenges", String(w.hero), "default"] : ["Default Challenge"]], global: !(w.hero > 0),
+		samples: D.skills.filter(s => s.id > 5 && !learn.has(s.id) && infoOf(s.id).damaging).map(s => s.id) };
+}
+const isTimingDefault = d => d && typeof d === "object" && Object.keys(d).length === 1 && d.type === "timing";
+function slotValue(slot) {
+	if (!slot.paths.length) return { state: "empty" };
+	const vals = slot.paths.map(getAt), keys = vals.map(v => v === undefined ? "u" : JSON.stringify(v));
+	if (!keys.every(k => k === keys[0])) return { state: "mixed", n: keys.filter(k => k !== keys[0]).length };
+	if (slot.global) return { state: isTimingDefault(vals[0]) || vals[0] === undefined ? "default" : "same", def: vals[0] };
+	return { state: vals[0] === undefined ? "default" : "same", def: vals[0] };
+}
+function setSlot(slot, def) {
+	for (const p of slot.paths) {
+		if (p[0] === "Default Challenge") { P(p[0]).v = JSON.stringify(def === undefined ? { type: "timing" } : clone(def)); S.dirty = true; updateHeader(); }
+		else setAt(p, clone(def));
+	}
+}
+const aboveOf = id => id === "class" ? "char" : (slotFor("class") ? "class" : "char");
+function syncSame() {
+	for (const id of ["class", "extra"]) {
+		if (!S.same[id]) continue;
+		const slot = slotFor(id); if (!slot) continue;
+		const av = slotValue(slotFor(aboveOf(id)));
+		if (av.state === "mixed" || av.state === "empty") continue;
+		setSlot(slot, av.state === "default" ? undefined : av.def);
+	}
+}
+function initSame() {
+	S.same = {};
+	for (const id of ["class", "extra"]) {
+		const slot = slotFor(id); if (!slot) continue;
+		const v = slotValue(slot), a = slotValue(slotFor(aboveOf(id)));
+		S.same[id] = v.state === "same" && a.state === "same" && JSON.stringify(v.def) === JSON.stringify(a.def);
+	}
+}
+
+// ---- stage follows the active section
+function applyPreview() {
+	const w = S.who, t = S.test;
+	t.hero = w.hero; t.cls = w.cls || heroClass(w.hero);
+	let sk;
+	if (S.tab === "skill") sk = S.skillSel;
+	else {
+		if (!slotFor(S.active)) S.active = "char";
+		const slot = slotFor(S.active); sk = S.sel[S.active];
+		if (!slot.samples.includes(sk)) sk = slot.samples[0] || 1;
+		S.sel[S.active] = sk;
+	}
+	selectSkill(sk, true);
+	fillPreviewPicker();
+}
+function fillPreviewPicker() {
+	const wrap = $("previewWrap"), sel = $("previewSkill");
+	if (!S.db || S.tab !== "char") { wrap.style.display = "none"; return; }
+	wrap.style.display = "";
+	sel.textContent = "";
+	for (const id of slotFor(S.active).samples.slice(0, 80)) sel.append(el("option", { value: id, textContent: infoOf(id).name + " (#" + id + ")" }));
+	sel.value = S.sel[S.active];
+}
+$("previewSkill").onchange = () => { S.sel[S.active] = Number($("previewSkill").value); applyPreview(); startHero(); };
+function previewNow() { applyPreview(); startHero(); }
+
+// ---- shared minigame settings editor
+function fieldsInto(host, cur, upd) {
+	const typeKey = cur.type || "timing";
+	for (const [key, min, max, step, dflt] of TYPE_FIELDS[typeKey]) {
+		const val = cur[key] !== undefined ? cur[key] : dflt;
+		const rng = el("input", { type: "range", min, max, step, value: val });
+		const num = el("input", { type: "number", min, max, step, value: val });
+		const reset = el("button", { className: "sm", textContent: "↺", title: "Back to default (" + dflt + ")" });
+		const set = v => { v = Number(v); if (!isFinite(v)) return; cur[key] = v; rng.value = num.value = v; upd(false); };
+		rng.oninput = () => set(rng.value); num.oninput = () => set(num.value);
+		reset.onclick = () => { delete cur[key]; rng.value = num.value = dflt; upd(false); };
+		host.append(el("div", { className: "row" }, el("label", { textContent: key }), rng, num, reset));
+	}
+	if (typeKey === "sequence") {
+		const inp = el("input", { type: "text", value: Array.isArray(cur.keys) ? cur.keys.join(",") : "", placeholder: "random (or Z,Y,X…)" });
+		inp.onchange = () => { const ks = inp.value.split(/[\s,]+/).filter(Boolean).map(x => x.toUpperCase()); if (ks.length) cur.keys = ks; else delete cur.keys; upd(false); };
+		host.append(el("div", { className: "row" }, el("label", { textContent: "keys" }), inp));
+	}
+	if (typeKey === "mash") {
+		const inp = el("input", { type: "text", value: cur.key || "ENTER", size: 8 });
+		inp.onchange = () => { const k = inp.value.trim().toUpperCase(); if (k && k !== "ENTER") cur.key = k; else delete cur.key; upd(false); };
+		host.append(el("div", { className: "row" }, el("label", { textContent: "key" }), inp));
+	}
+}
+function gameSelect(state, def, opts) { // opts: { defaultLabel }
+	const sel = el("select", { style: "flex:1" });
+	sel.append(el("option", { value: "default", textContent: opts.defaultLabel }), el("option", { value: "none", textContent: "No minigame" }));
+	for (const k of Object.keys(TYPE_FIELDS)) sel.append(el("option", { value: k, textContent: k[0].toUpperCase() + k.slice(1) }));
+	if (state === "mixed") sel.append(el("option", { value: "mixed", textContent: "Mixed (" + opts.mixedN + " differ)" }));
+	sel.value = state === "mixed" ? "mixed" : state === "default" ? "default" : def === false ? "none" : ((def && def.type) || "timing");
+	return sel;
+}
+
+// ---- Characters tab
+const secHosts = {};
+function secTitle(id) {
+	const w = S.who, D = S.db;
+	const hn = w.hero > 0 ? dbName("heroes", w.hero, "Hero") : "Everyone", cn = w.cls > 0 ? dbName("classes", w.cls, "Class") : "";
+	if (id === "char") return { t: hn, s: w.hero > 0 ? "Basic attacks (Attack)" : "Basic attacks for every character" };
+	if (id === "class") {
+		const others = D.heroes.filter(h => h.id !== w.hero && heroClass(h.id) === w.cls).map(h => h.name);
+		return { t: cn, s: "All skills this class can learn (" + learnIds(w.cls).length + ")" + (others.length ? ". Also used by: " + others.join(", ") : "") };
+	}
+	return { t: "Additional skills", s: w.hero > 0 ? "Any other skill " + hn + " uses" : "Every other skill (the global default)" };
+}
+function renderSection(id) {
+	const host = secHosts[id]; if (!host) return;
+	host.textContent = "";
+	const slot = slotFor(id); host.style.display = slot ? "" : "none"; if (!slot) return;
+	host.className = "sec" + (S.active === id ? " active" : "");
+	const { t, s } = secTitle(id), val = slotValue(slot);
+	host.append(el("div", { className: "sech", textContent: t }), el("div", { className: "hint", textContent: s }));
+	const above = id === "char" ? null : secTitle(aboveOf(id)).t;
+	let same = false;
+	if (above) {
+		const cb = el("input", { type: "checkbox", checked: !!S.same[id] });
+		cb.onchange = () => { S.same[id] = cb.checked; if (cb.checked) { syncSame(); refreshAll(); scheduleRerun(); } else renderSection(id); };
+		host.append(el("div", { className: "row wide" }, cb, el("label", { textContent: "Same as " + above })));
+		same = !!S.same[id];
+	}
+	const sample = slot.samples[0] || 1;
+	const inh = slot.global ? null : inheritText(sample);
+	const sel = gameSelect(val.state === "empty" ? "default" : val.state, val.def, { defaultLabel: slot.global ? "Default (Timing)" : "Default (inherit)", mixedN: val.n });
+	sel.disabled = same || val.state === "empty";
+	sel.onchange = () => {
+		const v = sel.value; if (v === "mixed") return;
+		setSlot(slot, v === "default" ? undefined : v === "none" ? false : { type: v });
+		syncSame(); refreshAll(); scheduleRerun();
+	};
+	host.append(el("div", { className: "row" }, el("label", { textContent: "Minigame" }), sel));
+	if (val.state === "empty") host.append(el("div", { className: "hint", textContent: "This class has no learnable skills in the database." }));
+	if (val.state === "default" && inh) host.append(el("div", { className: "hint", textContent: "Right now: " + inh }));
+	if (val.state === "mixed") {
+		const b = el("button", { className: "sm", textContent: "Make them all the same (first one wins)" });
+		b.onclick = () => { const first = getAt(slot.paths[0]); setSlot(slot, first); syncSame(); refreshAll(); scheduleRerun(); };
+		host.append(el("div", { className: "hint", textContent: val.n + " skill(s) have their own setting (see the Skills tab)." }), b);
+	}
+	if (val.state === "same" && !same && val.def && typeof val.def === "object") {
+		const cur = val.def;
+		const upd = (rerender) => { setSlot(slot, cur); syncSame(); for (const o of ["char", "class", "extra"]) if (o !== id) renderSection(o); if (rerender) renderSection(id); scheduleRerun(); };
+		const themeSel = el("select");
+		themeSel.append(el("option", { value: "", textContent: "auto (from skill element)" }));
+		for (const k of THEME_LIST) themeSel.append(el("option", { value: k, textContent: k }));
+		themeSel.value = cur.theme || "";
+		themeSel.onchange = () => { if (themeSel.value) cur.theme = themeSel.value; else delete cur.theme; upd(false); };
+		const body = el("div"); fieldsInto(body, cur, upd);
+		body.append(el("div", { className: "row" }, el("label", { textContent: "Look" }), themeSel));
+		host.append(body);
+	} else if (same) host.append(el("div", { className: "hint", textContent: "Uses " + above + "'s settings." }));
+}
+function refreshAll() { for (const id of ["char", "class", "extra"]) renderSection(id); updateHeader(); }
+function setActive(id) { if (S.active === id) return; S.active = id; for (const o of ["char", "class", "extra"]) if (secHosts[o]) secHosts[o].classList.toggle("active", o === id); previewNow(); }
+
+function renderCharTab(side) {
+	const D = S.db, who = el("div", { className: "box" });
+	const pick = (label, list, cur, zero, onPick) => {
+		const sel = el("select", { style: "flex:1" });
+		sel.append(el("option", { value: 0, textContent: zero }));
+		for (const o of list) sel.append(el("option", { value: o.id, textContent: String(o.id).padStart(3, "0") + ": " + o.name }));
+		sel.value = cur; sel.onchange = () => onPick(Number(sel.value));
+		return el("div", { className: "row" }, el("label", { textContent: label }), sel);
+	};
+	who.append(
+		pick("Character", D.heroes, S.who.hero, "Everyone (default)", id => { S.who.hero = id; S.who.cls = id ? heroClass(id) : 0; S.active = "char"; initSame(); renderSide(); previewNow(); }),
+		pick("Class", D.classes, S.who.cls, "Any class (default)", id => { S.who.cls = id; S.active = "char"; initSame(); renderSide(); previewNow(); }));
+	side.append(who);
+	for (const id of ["char", "class", "extra"]) {
+		const h = el("div"); secHosts[id] = h;
+		h.addEventListener("pointerdown", () => setActive(id));
+		h.addEventListener("focusin", () => setActive(id));
+		side.append(h); renderSection(id);
+	}
+	side.append(el("div", { className: "hint", textContent: "Settings are saved per character, class and skill. A skill's own setting (Skills tab) and a character's setting beat the class's. Click a section to preview it on the stage." }));
+}
+
+// ---- Skills tab
+function autoTheme(info) {
+	const m = jsonOf("Element Themes", {});
+	if (info.element && m[info.element]) return m[info.element];
+	for (const r of jsonOf("Name Themes", [])) { try { if (new RegExp(r.match, "i").test(info.name)) return r.theme; } catch (e) { /* ignore */ } }
+	return "plain";
+}
+function clearHigher(skillId) { // a skill's own setting replaces character/class entries for it
+	const id = String(skillId);
+	for (const [param, key] of [["Hero Challenges", "skills"], ["Class Challenges", "skills"]]) {
+		const tbl = jsonOf(param, {});
+		for (const k of Object.keys(tbl)) if (tbl[k] && tbl[k][key] && tbl[k][key][id] !== undefined) setAt([param, k, key, id], undefined);
+	}
+}
+function renderSkillTab(side) {
+	const D = S.db, id = S.skillSel, info = infoOf(id);
+	const filt = el("input", { type: "text", placeholder: "Search skills…", value: S.skillFilter, style: "width:100%" });
+	const list = el("div", { className: "skills" });
+	const fill = () => {
+		list.textContent = "";
+		for (const sk of D.skills) {
+			if ([2, 3, 4, 5].includes(sk.id) || (S.skillFilter && !(sk.name + " " + sk.id).toLowerCase().includes(S.skillFilter.toLowerCase()))) continue;
+			const b = el("button", { className: "sk" + (sk.id === id ? " on" : ""), textContent: sk.name + "  #" + sk.id });
+			b.onclick = () => { S.skillSel = sk.id; renderSide(); previewNow(); };
+			list.append(b);
+		}
+	};
+	filt.oninput = () => { S.skillFilter = filt.value; fill(); };
+	fill();
+	side.append(el("div", { className: "box" }, filt, list));
+	setTimeout(() => { const on = list.querySelector(".on"); if (on) list.scrollTop = on.offsetTop - list.offsetTop - 60; }, 0);
+
+	const box = el("div", { className: "sec active" }); side.append(box);
+	const path = ["Skill Challenges", String(id)];
+	const render = () => {
+		box.textContent = "";
+		const cur0 = getAt(path), state = cur0 === undefined ? "default" : "same";
+		const elemName = (D.elements.find(e => e.id === info.element) || {}).name;
+		box.append(el("div", { className: "sech", textContent: info.name }),
+			el("div", { className: "hint", textContent: (info.damaging ? "Damages / heals" : "No damage (buff / status)") + " · Element: " + (info.element ? (elemName || "#" + info.element) : "none") + " · Look when auto: " + autoTheme(info) + (info.runOn ? " · Run on Attack" : "") + (info.tag ? " · tag: " + info.tag : "") }));
+		const sel = gameSelect(state, cur0, { defaultLabel: "Default (inherit)" });
+		const apply = def => { setAt(path, clone(def)); clearHigher(id); };
+		sel.onchange = () => {
+			const v = sel.value;
+			apply(v === "default" ? undefined : v === "none" ? false : { type: v });
+			render(); scheduleRerun();
+		};
+		box.append(el("div", { className: "row" }, el("label", { textContent: "Minigame" }), sel));
+		if (state === "default") box.append(el("div", { className: "hint", textContent: "Right now: " + inheritText(id) }));
+		if (cur0 && typeof cur0 === "object") {
+			const cur = cur0, upd = () => { apply(cur); scheduleRerun(); };
+			fieldsInto(box, cur, upd);
+			const ts = el("select");
+			ts.append(el("option", { value: "", textContent: "auto (" + autoTheme(info) + ")" }));
+			for (const k of THEME_LIST) ts.append(el("option", { value: k, textContent: k }));
+			ts.value = cur.theme || "";
+			ts.onchange = () => { if (ts.value) cur.theme = ts.value; else delete cur.theme; upd(); };
+			box.append(el("div", { className: "row" }, el("label", { textContent: "Look" }), ts));
+		} else if (state === "default" && info.damaging) {
+			const ts = el("select");
+			ts.append(el("option", { value: "", textContent: "auto (" + autoTheme(info) + ")" }));
+			for (const k of THEME_LIST) ts.append(el("option", { value: k, textContent: k }));
+			ts.onchange = () => { if (!ts.value) return; const t = tFor(id), lv = resolveLevel(t), d = lv ? getAt(pathFor(lv, t)) : undefined; apply(Object.assign({}, d && typeof d === "object" ? clone(d) : { type: "timing" }, { theme: ts.value })); render(); scheduleRerun(); };
+			box.append(el("div", { className: "row" }, el("label", { textContent: "Look" }), ts));
+		}
+		box.append(el("div", { className: "hint", textContent: "Applies to every character and class. Per-character settings for this skill are replaced when you change it." }));
+	};
+	render();
+
+	// look per element (used by every skill of that element)
+	const eb = el("div"), map = jsonOf("Element Themes", {});
+	for (const e of D.elements) {
+		const ts = el("select");
+		for (const k of THEME_LIST) ts.append(el("option", { value: k, textContent: k }));
+		ts.value = map[e.id] || "plain";
+		ts.onchange = () => { const m = jsonOf("Element Themes", {}); m[e.id] = ts.value; P("Element Themes").v = JSON.stringify(m); S.dirty = true; updateHeader(); scheduleRerun(); };
+		eb.append(el("div", { className: "row" }, el("label", { textContent: e.name }), ts));
+	}
+	const det = el("details"); det.dataset.k = "elooks";
+	det.append(el("summary", { textContent: "Look for each element" }), el("div", {}, el("div", { className: "hint", textContent: "Skills use their database element to pick a look, unless the skill sets its own." }), eb));
+	side.append(det);
+}
+
+function renderSide() {
+	const tabs = $("tabs"); tabs.textContent = "";
+	if (!S.db) { tabs.style.display = "none"; fillPreviewPicker(); return renderLegacySide("all"); }
+	tabs.style.display = "";
+	for (const [k, label] of [["char", "Characters"], ["skill", "Skills"], ["settings", "Settings"]]) {
+		const b = el("button", { className: "tab" + (S.tab === k ? " on" : ""), textContent: label });
+		b.onclick = () => { if (S.tab === k) return; S.tab = k; renderSide(); if (k !== "settings") previewNow(); };
+		tabs.append(b);
+	}
+	const side = $("side"), scroll = side.parentNode.scrollTop; side.textContent = "";
+	if (S.tab === "char") renderCharTab(side);
+	else if (S.tab === "skill") renderSkillTab(side);
+	else renderLegacySide("settings");
+	fillPreviewPicker();
+	side.parentNode.scrollTop = scroll;
 }
 
 function renderStats() {
@@ -807,7 +1117,8 @@ async function attach(h) {
 	try { // project folder: heroes.json at the top, plugin under Plugins/Quick Time Battle
 		const [heroes, classes, skills] = await Promise.all(["heroes", "classes", "skills"].map(n => readJson(h, n + ".json")));
 		const mk = (arr) => (arr || []).map(o => ({ id: o.id, name: o.name || (o.names && o.names["1"]) || ("#" + o.id), raw: o }));
-		db = { heroes: mk(heroes.heroes), classes: mk(classes.classes), skills: mk(skills.skills) };
+		let elements = []; try { elements = mk((await readJson(h, "battleSystem.json")).elements); } catch (e) { /* optional */ }
+		db = { heroes: mk(heroes.heroes), classes: mk(classes.classes), skills: mk(skills.skills), elements };
 		plugin = await (await h.getDirectoryHandle("Plugins")).getDirectoryHandle(PLUGIN);
 	} catch (e) { db = null; plugin = null; }
 	if (!plugin) { // maybe the plugin folder itself
@@ -821,7 +1132,7 @@ async function attach(h) {
 	loadDetails(JSON.parse(dtext), dtext);
 	try { const c = await (await (await plugin.getFileHandle("code.js")).getFile()).text(); S.code = c; S.codeNote = "code.js v" + versionOf(c) + " from your project"; }
 	catch (e) { S.code = EMBED_CODE; S.codeNote = "built-in copy of code.js"; }
-	if (db) selectHero(S.test.hero && db.heroes.some(o => o.id === S.test.hero) ? S.test.hero : (db.heroes[0] || {}).id, true);
+	if (db) { const hid = db.heroes.some(o => o.id === S.test.hero) ? S.test.hero : (db.heroes[0] || {}).id; S.who = { hero: hid, cls: heroClass(hid) }; S.tab = "char"; S.active = "char"; S.sel = {}; initSame(); applyPreview();  startHero(); }
 	setStatus((db ? "Project: " + h.name + " (" + db.heroes.length + " heroes, " + db.skills.length + " skills)" : "Plugin folder: " + h.name + " (no project data: IDs are typed in)") + " · testing " + S.codeNote);
 	updateHeader(); renderSide(); scheduleRerun();
 	return true;

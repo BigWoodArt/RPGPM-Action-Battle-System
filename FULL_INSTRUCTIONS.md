@@ -123,11 +123,17 @@ Quick Time Battle > Set enabled, value OFF. Set it back to ON afterwards. This s
 `Tester.html` runs the plugin's real `code.js` on a mock battle. It changes nothing until you save.
 
 1. Open `Tester.html` in Chrome or Edge. Click **Open project folder** and pick your RPG Paper Maker project folder (the one with `heroes.json`). Browsers cannot look up folders on their own, so this is asked once; after that the tester reconnects by itself (or with one click).
-2. **What to test**: pick a Character (fills their class, which you can change), then a Skill / action. Skills come from your project, including Run on Attack, element and any `// qtb` tag. It shows which table entry the challenge comes from.
-3. **Challenge for this target**: change type, theme and numbers with sliders. Choose whether the change applies to the skill, the hero, the class or everything. The stage re-runs on each change.
-4. Press **Run challenge** (or click the stage and use W A S D / Enter). **Dodge test** runs an enemy attack against your dodge settings.
-5. Other settings are in the sections below. Ranged Hero slots: enter the hero ID the variable holds, then test a skill with Run on Attack.
+2. **Characters tab**: pick a Character (fills their class, which you can change). Each has a Default option: *Everyone* and *Any class* edit the global settings.
+   - **Character section**: the minigame for that character's basic attacks.
+   - **Class section**: the minigame for every skill the class can learn. Shows who else shares the class.
+   - **Additional skills**: any other skill the character uses.
+   - Each minigame list has *Default (inherit)* and *No minigame*. *Same as...* copies the section above and keeps following it.
+3. **Skills tab**: pick one skill. Set its minigame, settings and look (theme). Shows the database element. A skill's own setting applies to every character and replaces per-character settings for that skill. *Look for each element* sets the theme per element.
+4. Click a section to run it on the stage. Use *Preview skill* to pick which skill of that section runs. Change anything and the stage re-runs. Play with W A S D / Enter. **Dodge test** runs an enemy attack against your dodge settings.
+5. **Settings tab**: every other plugin setting. Ranged Hero slots: enter the hero ID the variable holds, then preview a skill with Run on Attack.
 6. **Save to plugin** writes `details.json` and keeps `details.backup.json`. Then close the plugin window in the editor without pressing OK, reopen it, and restart the engine.
+
+The last change wins when two places set the same skill.
 
 Without Chrome or Edge, use **Load details.json** and **Download details.json** instead (IDs are typed in).
 
