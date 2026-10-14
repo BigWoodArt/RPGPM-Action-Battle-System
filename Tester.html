@@ -872,7 +872,7 @@ function slotFor(sec) {
 	if (sec === "class") {
 		if (!(w.cls > 0)) return null;
 		const ids = learnIds(w.cls);
-		return { paths: ids.map(id => ["Class Challenges", String(w.cls), "skills", String(id)]), samples: ids.filter(id => infoOf(id).damaging).concat(ids.filter(id => !infoOf(id).damaging)) };
+		return { paths: [["Class Challenges", String(w.cls), "default"]], legacy: ids.map(id => ["Class Challenges", String(w.cls), "skills", String(id)]), samples: ids.filter(id => infoOf(id).damaging).concat(ids.filter(id => !infoOf(id).damaging)) };
 	}
 	const learn = new Set(w.cls > 0 ? learnIds(w.cls) : []);
 	return { paths: [w.hero > 0 ? ["Hero Challenges", String(w.hero), "default"] : ["Default Challenge"]], global: !(w.hero > 0),
@@ -887,6 +887,7 @@ function slotValue(slot) {
 	return { state: vals[0] === undefined ? "default" : "same", def: vals[0] };
 }
 function setSlot(slot, def) {
+	for (const p of slot.legacy || []) if (getAt(p) !== undefined) setAt(p, undefined); // old per-skill class entries would beat the class setting
 	for (const p of slot.paths) {
 		if (p[0] === "Default Challenge") { snap(); P(p[0]).v = JSON.stringify(def === undefined ? { type: "timing" } : clone(def)); S.dirty = true; updateHeader(); }
 		else setAt(p, clone(def));
@@ -914,9 +915,9 @@ function initSame() {
 // ---- warnings before a change touches other settings
 function guardClass() {
 	const w = S.who, key = "c" + w.cls; if (S.confirmed.class === key) return true;
-	const n = learnIds(w.cls).filter(id => getAt(["Skill Challenges", String(id)]) !== undefined).length;
+	const n = learnIds(w.cls).filter(id => getAt(["Class Challenges", String(w.cls), "skills", String(id)]) !== undefined).length;
 	if (n === 0) return true;
-	if (!confirm(n + " of this class's skills have their own setting (Skills tab).\nA class setting overrides those for this class. Continue?")) return false;
+	if (!confirm(n + " per-skill entries saved for this class (older version) will be replaced by this class setting. Continue?")) return false;
 	S.confirmed.class = key; return true;
 }
 function guardSkill(id) {
@@ -1006,7 +1007,7 @@ function renderSection(id) {
 	host.className = "sec" + (S.active === id ? " active" : "");
 	const { t, s } = secTitle(id), val = slotValue(slot);
 	host.append(el("div", { className: "sech", textContent: t }), el("div", { className: "hint", textContent: s }));
-	if (id === "class") host.append(el("div", { className: "hint", textContent: "Changing this sets every skill the class learns." }));
+	if (id === "class") host.append(el("div", { className: "hint", textContent: "Used for the class's skills unless a skill has its own setting (Skills tab)." + (S.who.hero > 0 ? " A different Additional skills setting for this character wins over it." : "") }));
 	const above = id === "char" ? null : secTitle(aboveOf(id)).t;
 	let same = false;
 	if (above) {
