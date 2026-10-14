@@ -41,7 +41,7 @@ Open Plugins > Quick Time Battle to edit these.
 
 ### Dodge
 - **Defense Enabled** - the dodge feature on or off.
-- **Defense Window Frames** - how many frames (60 per second) before the hit a press counts. Bigger is easier.
+- **Defense Window Frames** - how many frames (60 per second) before the hit a press counts. Bigger is easier. Default 12 (0.2 s). Existing settings keep their saved value.
 - **Defense Cooldown** - seconds before another dodge press is accepted (stops key mashing).
 - **Defense Slide Distance** - how far heroes (and dodging enemies) sidestep.
 - **Defense Slide Duration** - seconds the sidestep takes.
@@ -64,7 +64,7 @@ Which challenge a skill gets is decided in this order, first match wins:
 Steps 4 to 6 only apply to skills that deal damage or heal.
 
 - **Default Challenge** - for example `{"type":"timing"}`.
-- **Class Challenges** - `{"3":{"default":{"type":"ring"},"skills":{"12":{"type":"mash"}}}}` (class 3).
+- **Class Challenges** - `{"3":{"default":{"type":"crosshair"},"skills":{"12":{"type":"mash"}}}}` (class 3).
 - **Hero Challenges** - same shape, keyed by hero ID.
 - **Skill Challenges** - `{"12":{"type":"sequence","length":3},"20":false}` (`false` = no challenge).
 - **Element Themes** - element ID to theme: `{"1":"fire","2":"ice"}`. Themes: plain, fire, lightning, ice, water,
@@ -85,14 +85,15 @@ Use these as `"type"` in the tables or in a skill tag. All numbers are optional.
 | type | what the player does | options (default) |
 | --- | --- | --- |
 | `timing` | Enter while the marker is in the zone | `duration` (1.2 s), `zone` (0.16), `center` (0.75) |
-| `ring` | Enter when the shrinking ring matches the target | `duration` (1.1), `tolerance` (0.1) |
+| `greenlight` | wait while orbs show an X; Enter the moment a green GO! shows (early = Oops, faster = better) | `window` (1.0 s to react), `minWait` (0.7), `maxWait` (2.0) |
 | `sequence` | press the shown keys in order | `length` (4), `duration` (2.2), `keys` (e.g. `["W","A","S"]`) |
-| `mash` | press a key as many times as possible | `count` goal (12), `duration` (2), `key` (ENTER), `overload` (none) |
+| `mash` | press a key as many times as possible | `count` goal (8), `duration` (2.5), `key` (ENTER), `overload` (none) |
 | `hold` | hold Enter, release in the zone | `duration` (1.5), `zone` (0.16), `center` (0.8) |
 | `aim` | hold Enter to raise an arc, release when it lands on the enemy | `duration` (1.75), `tolerance` (0.1) |
 | `combo` | several rings in a row; grade is the average | `count` (3), `duration` (0.6), `tolerance` (0.12) |
 | `crosshair` | Enter when the sight locks on the enemy | `duration` (1.1), `tolerance` (0.1) |
 
+`ring` (older name) still works in saved settings; `crosshair` is the same game and looks better.
 Every type also accepts `"theme"` (for example `"theme":"fire"`) to force a look.
 `overload` on `mash` is a multiple of the goal: pressing more than that many times ruins the attack.
 
@@ -102,7 +103,7 @@ For one-off changes, add a **Script** effect to the skill (Skills > Effects) and
 
 ```
 // qtb hold
-// qtb ring theme=fire tolerance=0.08
+// qtb crosshair theme=fire tolerance=0.08
 // qtb {"type":"sequence","length":5}
 // qtb off
 // qtb
@@ -138,6 +139,10 @@ The last change wins when two places set the same skill. The tester warns before
 **Undo** (or Ctrl+Z) steps back one change. **Revert** drops all unsaved changes. The Settings tab has **Reset all settings to the defaults**; Undo still works after it.
 
 Without Chrome or Edge, use **Load details.json** and **Download details.json** instead (IDs are typed in).
+
+## Ranged characters
+
+In the Tester, tick **Ranged Character** under a character's name. That character never runs up to the enemy, even for skills with Run on Attack. It is saved as `"ranged": true` in Hero Challenges. The older Ranged Hero variable slots (Settings) still work.
 
 ## Updating
 
