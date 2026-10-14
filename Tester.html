@@ -62,6 +62,7 @@ header details.menu>summary::-webkit-details-marker{display:none}
 .menuList{position:absolute;left:0;top:34px;z-index:40;background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:4px!important;min-width:250px;display:flex;flex-direction:column;gap:2px;box-shadow:0 6px 20px rgba(0,0,0,.5)}
 .menuList button{text-align:left;border:0;background:none;padding:6px 10px;border-radius:4px}.menuList button:hover:not(:disabled){background:var(--panel2)}
 .menuList hr{border:0;border-top:1px solid var(--line);margin:3px 0;width:100%}
+.vgrid{display:grid;grid-template-columns:210px 1fr;gap:8px;margin:8px 0 12px}.vcol{max-height:340px;overflow:auto;display:flex;flex-direction:column;gap:2px;border:1px solid var(--line);border-radius:6px;padding:4px}
 .skhead{position:sticky;top:0;z-index:1;background:var(--panel);border-top:3px solid var(--acc);margin-top:8px;padding:4px 2px 2px;font-weight:700;font-size:12px;color:var(--acc)}
 .skhead:first-child{margin-top:0}
 .welcome{padding:6px 4px}.welcome h2{margin:4px 0 8px}.welcome ol{padding-left:20px}.welcome li{margin:8px 0}
@@ -1057,6 +1058,34 @@ function renderSection(id) {
 function refreshAll() { for (const id of ["char", "class", "extra"]) renderSection(id); updateHeader(); }
 function setActive(id) { if (S.active === id) return; S.active = id; for (const o of ["char", "class", "extra"]) if (secHosts[o]) secHosts[o].classList.toggle("active", o === id); previewNow(); }
 
+const varName = id => { for (const pg of (S.db && S.db.variables) || []) for (const v of pg.list) if (v.id === id) return v.name || ""; return ""; };
+const varLabel = id => id > 0 ? String(id).padStart(3, "0") + ": " + (varName(id) || "(unnamed)") : "None (choose…)";
+// Engine-style variable picker: pages on the left, variables on the right. Resolves to the variable id, 0 for none, null if cancelled.
+function pickVariable(cur) {
+	return new Promise(res => {
+		const pages = (S.db && S.db.variables) || [];
+		let pg = Math.max(0, pages.findIndex(p => p.list.some(v => v.id === cur))), sel = cur;
+		const left = el("div", { className: "vcol" }), right = el("div", { className: "vcol" });
+		const done = v => { m.remove(); res(v); };
+		const draw = () => {
+			left.textContent = ""; right.textContent = "";
+			pages.forEach((p, i) => {
+				const b = el("button", { className: "sk" + (i === pg ? " on" : ""), textContent: p.name + "  (" + p.list[0].id + "–" + p.list[p.list.length - 1].id + ")" });
+				b.onclick = () => { pg = i; draw(); }; left.append(b);
+			});
+			for (const v of pages[pg].list) {
+				const b = el("button", { className: "sk" + (v.id === sel ? " on" : ""), textContent: String(v.id).padStart(3, "0") + ": " + (v.name || "") });
+				b.onclick = () => { sel = v.id; draw(); }; b.ondblclick = () => done(v.id); right.append(b);
+			}
+		};
+		const ok = el("button", { className: "pri", textContent: "OK" }), none = el("button", { textContent: "None" }), cancel = el("button", { textContent: "Cancel" });
+		ok.onclick = () => done(sel); none.onclick = () => done(0); cancel.onclick = () => done(null);
+		const m = el("div", { className: "modal" }, el("div", { style: "min-width:560px" }, el("h2", { textContent: "Select a variable" }),
+			el("div", { className: "hint", textContent: "The variable that holds this character's Instance ID (chosen when they join the party; Lucas is Variable 1)." }),
+			el("div", { className: "vgrid" }, left, right), el("div", { className: "row", style: "justify-content:flex-end" }, none, cancel, ok)));
+		document.body.append(m); draw();
+	});
+}
 function renderCharTab(side) {
 	const D = S.db, who = el("div", { className: "box" });
 	const pick = (label, list, cur, zero, onPick) => {
@@ -1083,20 +1112,21 @@ function renderCharTab(side) {
 		};
 		const rc = el("input", { type: "checkbox", checked: getAt(hp) === true || slotHas(varOf()) });
 		const note = el("div", { className: "hint" });
-		const showNote = () => { note.textContent = varOf() ? "Ranged characters stay put when attacking (no Run on Enemy). Linked to Variable " + varOf() + "." : "Ranged characters stay put when attacking (no Run on Enemy). Enter this character's Instance ID variable below to also keep the old Ranged Hero slots in sync."; };
+		const showNote = () => { note.textContent = varOf() ? "Ranged characters stay put when attacking (no Run on Enemy). Linked to Variable " + varOf() + "." : "Ranged characters stay put when attacking (no Run on Enemy). Choose this character's Instance ID variable below to also keep the Ranged Hero slots in sync (this only affects Run on Enemy)."; };
 		rc.onchange = () => {
 			setAt(hp, rc.checked ? true : undefined);
 			if (!syncSlots(rc.checked, varOf())) alert("All 8 Ranged Hero slots are used. Free one in Settings.");
 			showNote(); scheduleRerun();
 		};
-		const vin = el("input", { type: "number", min: 0, step: 1, value: varOf() || "", placeholder: "none", style: "width:80px" });
-		vin.onchange = () => {
-			const old = varOf(), nv = Math.max(0, Math.floor(Number(vin.value) || 0)), was = rc.checked;
+		const vbtn = el("button", { style: "flex:1;text-align:left", textContent: varLabel(varOf()) });
+		const applyVar = nv => {
+			const old = varOf(), was = rc.checked;
 			if (old !== nv) { if (old > 0 && was) syncSlots(false, old); setAt(vp, nv > 0 ? nv : undefined); if (was) syncSlots(true, nv); }
-			rc.checked = getAt(hp) === true || slotHas(varOf()); showNote(); scheduleRerun();
+			rc.checked = getAt(hp) === true || slotHas(varOf()); vbtn.textContent = varLabel(varOf()); showNote(); scheduleRerun();
 		};
+		vbtn.onclick = async () => { const nv = await pickVariable(varOf()); if (nv !== null) applyVar(nv); };
 		who.append(el("div", { className: "row wide" }, rc, el("label", { textContent: "Ranged Character", title: "Never runs up to the enemy, even for skills with Run on Attack" })), note,
-			el("div", { className: "row" }, el("label", { textContent: "Instance ID variable", title: "The game Variable that holds this character's Instance ID (chosen when the character joins the party; Lucas is Variable 1)" }), vin));
+			el("div", { className: "row" }, el("label", { textContent: "Instance ID variable", title: "Used only to keep the Ranged Hero slots (Run on Enemy) in sync" }), vbtn));
 		showNote();
 	}
 	side.append(who);
@@ -1275,7 +1305,9 @@ async function attach(h) {
 		const [heroes, classes, skills] = await Promise.all(["heroes", "classes", "skills"].map(n => readJson(h, n + ".json")));
 		const mk = (arr) => (arr || []).map(o => ({ id: o.id, name: o.name || (o.names && o.names["1"]) || ("#" + o.id), raw: o }));
 		let elements = []; try { elements = mk((await readJson(h, "battleSystem.json")).elements); } catch (e) { /* optional */ }
-		db = { heroes: mk(heroes.heroes), classes: mk(classes.classes), skills: mk(skills.skills), elements };
+		let variables = []; try { variables = (await readJson(h, "variables.json")).variables || []; } catch (e) { /* optional */ }
+		if (!variables.length || !variables.every(p => p.list && p.list.length)) variables = [0, 1, 2, 3].map(i => ({ id: i + 1, name: "Page " + (i + 1), list: Array.from({ length: 25 }, (_, k) => ({ id: i * 25 + k + 1, name: "" })) }));
+		db = { heroes: mk(heroes.heroes), classes: mk(classes.classes), skills: mk(skills.skills), elements, variables };
 		plugin = await (await h.getDirectoryHandle("Plugins")).getDirectoryHandle(PLUGIN);
 	} catch (e) { db = null; plugin = null; }
 	if (!plugin) { // maybe the plugin folder itself
