@@ -137,6 +137,14 @@ const S = {
 try { Object.assign(S.test, JSON.parse(localStorage.getItem("qtb-tester-test") || "{}")); S.vars = JSON.parse(localStorage.getItem("qtb-tester-vars") || "{}"); } catch (e) { /* ignore */ }
 const saveLocal = () => { try { localStorage.setItem("qtb-tester-test", JSON.stringify(S.test)); localStorage.setItem("qtb-tester-vars", JSON.stringify(S.vars)); } catch (e) { /* ignore */ } };
 
+// Which hero a game Variable holds (the Instance ID variable). Set per hero in the Characters tab; Lucas defaults to Variable 1.
+function heroForVariable(n) {
+	try {
+		const tbl = JSON.parse(S.params.get("Hero Challenges").v || "{}");
+		for (const h of Object.keys(tbl)) if (tbl[h] && Number(tbl[h].variable) === n) return Number(h);
+	} catch (e) { /* ignore */ }
+	return n === 1 ? 1 : 0;
+}
 // ------------------------------------------------------------ parameters
 function coerce(k, v) {
 	if (k === 10) return typeof v === "boolean" ? v : String(v).toLowerCase() === "true";
@@ -239,7 +247,7 @@ function makeInstance(frames) {
 			getParameter(plugin, name) {
 				if (name in forced) return forced[name];
 				const p = S.params.get(name); if (!p) return undefined;
-				return p.k === 4 ? (p.v > 0 ? Number(S.vars[p.v] || 0) : 0) : p.v;
+				return p.k === 4 ? (p.v > 0 ? heroForVariable(p.v) : 0) : p.v;
 			},
 			getParameters() { const o = {}; for (const [n, p] of S.params) o[n] = { kind: p.k === 4 ? 4 : p.k, value: p.v }; return o; },
 			registerCommand() {}
@@ -735,9 +743,8 @@ function control(def) {
 		n.oninput = () => { setParam(name, n.value); renderSide(); };
 		const row = el("div", { className: "row" }, label(), el("span", { className: "tag", textContent: "variable #" }), n);
 		if (p.v > 0) {
-			const tv = el("input", { type: "number", step: 1, value: S.vars[p.v] || 0, title: "Tester only: the hero ID this variable holds" });
-			tv.oninput = () => { S.vars[p.v] = Number(tv.value) || 0; saveLocal(); scheduleRerun(); };
-			row.append(el("span", { className: "tag", textContent: "= hero ID" }), tv);
+			const hid = heroForVariable(p.v);
+			row.append(el("span", { className: "tag", textContent: hid && S.db ? "= " + dbName("heroes", hid, "Hero") : "= (set it on the Characters tab)" }));
 		}
 		wrap.append(row);
 		return wrap;
@@ -822,7 +829,7 @@ function renderLegacySide(part) {
 	for (const [group, items] of SCHEMA) {
 		const body = el("div");
 		for (const it of items) { const c = control(it); if (c) body.append(c); }
-		if (group.startsWith("Ranged Heroes")) body.prepend(el("div", { className: "hint", textContent: "Older method. The easy way: tick “Ranged Character” on the Characters tab. Each slot is a game Variable (as in the editor). To test here, enter the hero ID that variable holds, then tick “Skill has Run on Attack” and run the hero." }));
+		if (group.startsWith("Ranged Heroes")) body.prepend(el("div", { className: "hint", textContent: "Easiest: tick “Ranged Character” on the Characters tab; it keeps these slots in sync once the character\u2019s Instance ID variable is entered there. Each slot is a game Variable (as in the editor)." }));
 		mk(group, group, body);
 	}
 	// anything the schema does not know (parameters from newer versions)
@@ -1063,11 +1070,34 @@ function renderCharTab(side) {
 		pick("Character", D.heroes, S.who.hero, "Everyone (default)", id => { S.who.hero = id; S.who.cls = id ? heroClass(id) : 0; S.active = "char"; initSame(); renderSide(); previewNow(); }),
 		pick("Class", D.classes, S.who.cls, "Any class (default)", id => { S.who.cls = id; S.active = "char"; initSame(); renderSide(); previewNow(); }));
 	if (S.who.hero > 0) {
-		const hp = ["Hero Challenges", String(S.who.hero), "ranged"];
-		const rc = el("input", { type: "checkbox", checked: getAt(hp) === true });
-		rc.onchange = () => { setAt(hp, rc.checked ? true : undefined); scheduleRerun(); };
-		who.append(el("div", { className: "row wide" }, rc, el("label", { textContent: "Ranged Character", title: "Never runs up to the enemy, even for skills with Run on Attack" })),
-			el("div", { className: "hint", textContent: "Ranged characters stay put when attacking (no Run on Enemy)." }));
+		const hid = S.who.hero, key = String(hid), hp = ["Hero Challenges", key, "ranged"], vp = ["Hero Challenges", key, "variable"];
+		const slotNames = [1, 2, 3, 4, 5, 6, 7, 8].map(i => "Ranged Hero " + i);
+		const slotHas = v => v > 0 && slotNames.some(n => P(n) && Number(P(n).v) === v);
+		const varOf = () => { const v = Number(getAt(vp)); return v > 0 ? v : 0; };
+		// keep the old Ranged Hero variable slots in step with the checkbox
+		const syncSlots = (want, v) => {
+			if (!(v > 0)) return true;
+			if (want && !slotHas(v)) { const n = slotNames.find(x => P(x) && !(Number(P(x).v) > 0)); if (!n) return false; snap(); P(n).v = v; S.dirty = true; updateHeader(); }
+			if (!want) for (const n of slotNames) if (P(n) && Number(P(n).v) === v) { snap(); P(n).v = 0; S.dirty = true; updateHeader(); }
+			return true;
+		};
+		const rc = el("input", { type: "checkbox", checked: getAt(hp) === true || slotHas(varOf()) });
+		const note = el("div", { className: "hint" });
+		const showNote = () => { note.textContent = varOf() ? "Ranged characters stay put when attacking (no Run on Enemy). Linked to Variable " + varOf() + "." : "Ranged characters stay put when attacking (no Run on Enemy). Enter this character's Instance ID variable below to also keep the old Ranged Hero slots in sync."; };
+		rc.onchange = () => {
+			setAt(hp, rc.checked ? true : undefined);
+			if (!syncSlots(rc.checked, varOf())) alert("All 8 Ranged Hero slots are used. Free one in Settings.");
+			showNote(); scheduleRerun();
+		};
+		const vin = el("input", { type: "number", min: 0, step: 1, value: varOf() || "", placeholder: "none", style: "width:80px" });
+		vin.onchange = () => {
+			const old = varOf(), nv = Math.max(0, Math.floor(Number(vin.value) || 0)), was = rc.checked;
+			if (old !== nv) { if (old > 0 && was) syncSlots(false, old); setAt(vp, nv > 0 ? nv : undefined); if (was) syncSlots(true, nv); }
+			rc.checked = getAt(hp) === true || slotHas(varOf()); showNote(); scheduleRerun();
+		};
+		who.append(el("div", { className: "row wide" }, rc, el("label", { textContent: "Ranged Character", title: "Never runs up to the enemy, even for skills with Run on Attack" })), note,
+			el("div", { className: "row" }, el("label", { textContent: "Instance ID variable", title: "The game Variable that holds this character's Instance ID (chosen when the character joins the party; Lucas is Variable 1)" }), vin));
+		showNote();
 	}
 	side.append(who);
 	for (const id of ["char", "class", "extra"]) {

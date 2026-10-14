@@ -142,7 +142,7 @@ Without Chrome or Edge, use **Load details.json** and **Download details.json** 
 
 ## Ranged characters
 
-In the Tester, tick **Ranged Character** under a character's name. That character never runs up to the enemy, even for skills with Run on Attack. It is saved as `"ranged": true` in Hero Challenges. The older Ranged Hero variable slots (Settings) still work.
+In the Tester, tick **Ranged Character** under a character's name. That character never runs up to the enemy, even for skills with Run on Attack. It is saved as `"ranged": true` in Hero Challenges. The older Ranged Hero variable slots (Settings) still work. To keep them in sync with the checkbox, enter the character's **Instance ID variable** (the Variable chosen when they join the party; Lucas is Variable 1) under the checkbox. The checkbox then reads and updates those slots too.
 
 ## Updating
 
