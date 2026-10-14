@@ -1332,6 +1332,7 @@ async function idbSet(k, v) { try { const d = await idb(); d.transaction("kv", "
 async function idbGet(k) { try { const d = await idb(); return await new Promise(res => { const r = d.transaction("kv").objectStore("kv").get(k); r.onsuccess = () => res(r.result); r.onerror = () => res(null); }); } catch (e) { return null; } }
 
 // ------------------------------------------------------------ boot
+try { if (window.outerWidth < 1500 && window.screen) window.resizeTo(Math.min(screen.availWidth, 1700), Math.min(screen.availHeight, 1000)); } catch (e) { /* the host may not allow resizing */ }
 $("btnRun").onclick = () => { if (!$("auto").dataset.ran) $("auto").dataset.ran = 1; startHero(); };
 $("btnDodge").onclick = () => startDodge();
 $("nEnemies").onchange = () => scheduleRerun();
