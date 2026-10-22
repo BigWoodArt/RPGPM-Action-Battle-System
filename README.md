@@ -31,6 +31,7 @@ MIT (c) Wood (Skinnywoodplank). See LICENSE.
 
 ## Changelog
 
+- 1.2.0 New UI Theme setting: classic or noir (black and white, blue accents, dark blue outline, black hearts). Works with pixel or polished style. Existing settings keep working.
 - 1.1.0 New Greenlight minigame. Mash is easier (8 presses, Perfect at 1.6x). Dodge window default 12 frames. Ranged Character checkbox. Tester: More menu, grouped Skills list. Saved settings keep working.
 - 1.0.2 Confused heroes attacking a teammate get no challenge.
 - 1.0.1 Key sequences accept any key named in the sequence (e.g. Z, Y, X). Tester.html added.
