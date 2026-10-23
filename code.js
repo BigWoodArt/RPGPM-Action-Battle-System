@@ -1,4 +1,4 @@
-// Quick Time Battle v1.2.2 - RPG Paper Maker 3.0 plugin.
+// Quick Time Battle v1.2.3 - RPG Paper Maker 3.0 plugin.
 // Hero attacks and skills run a WASD + Enter quick-time challenge; the grade scales damage.
 // Press any key just before an enemy hit lands to dodge it. See FULL_INSTRUCTIONS.md.
 // Plugins run through `new Function(...)`: no imports. Globals: Common, Core, Data, Manager, Model, Scene.
