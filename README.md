@@ -31,6 +31,7 @@ MIT (c) Wood (Skinnywoodplank). See LICENSE.
 
 ## Changelog
 
+- 1.2.4 Tester: the window's X button closes it even with unsaved changes.
 - 1.2.3 Tester window opens centered on screen.
 - 1.2.2 Tester: shows errors when opening a folder; uses built-in defaults if details.json is missing.
 - 1.2.1 New "moth" UI Theme: off-white panels, outline fading from blue to black, black hearts. Classic and noir unchanged.
