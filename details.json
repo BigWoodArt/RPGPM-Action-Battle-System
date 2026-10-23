@@ -1,7 +1,7 @@
 {
 	"name": "Quick Time Battle",
 	"description": "Timed WASD + Enter challenges on hero attacks scale damage; press a key before an enemy hit to dodge it.",
-	"version": "1.2.7",
+	"version": "1.2.8",
 	"tutorial": "https://bigwoodart.github.io/RPGPM-Action-Battle-System/Tester.html",
 	"defaultParameters": [
 		{
@@ -65,6 +65,15 @@
 			"defaultValue": {
 				"k": 8,
 				"v": "classic"
+			}
+		},
+		{
+			"id": -1,
+			"name": "UI Colors",
+			"description": "Your own colour changes on top of the UI Theme, as JSON. Edit them in the Tester's Colors tab. {} = the theme's own colours.",
+			"defaultValue": {
+				"k": 8,
+				"v": "{}"
 			}
 		},
 		{
@@ -436,6 +445,15 @@
 			"defaultValue": {
 				"k": 8,
 				"v": "classic"
+			}
+		},
+		{
+			"id": -1,
+			"name": "UI Colors",
+			"description": "Your own colour changes on top of the UI Theme, as JSON. Edit them in the Tester's Colors tab. {} = the theme's own colours.",
+			"defaultValue": {
+				"k": 8,
+				"v": "{}"
 			}
 		},
 		{

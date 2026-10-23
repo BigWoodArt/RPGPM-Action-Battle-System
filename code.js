@@ -1,4 +1,4 @@
-// Quick Time Battle v1.2.7 - RPG Paper Maker 3.0 plugin.
+// Quick Time Battle v1.2.8 - RPG Paper Maker 3.0 plugin.
 // Hero attacks and skills run a WASD + Enter quick-time challenge; the grade scales damage.
 // Press any key just before an enemy hit lands to dodge it. See FULL_INSTRUCTIONS.md.
 // Plugins run through `new Function(...)`: no imports. Globals: Common, Core, Data, Manager, Model, Scene.
@@ -39,6 +39,7 @@ const DEFAULT_CONFIG = Object.assign({
 	overhead: true, // prompts float above the active hero
 	hintUses: 4, // text hints fade out after this many uses of each challenge type
 	beatPulse: true,
+	uiColors: {}, // per-colour overrides on top of the UI Theme (see the Colors tab in the Tester)
 	elementFrame: true, // elemental attacks: tinted panel, glow and drifting embers/flakes around the prompt
 	freezeScale: 1, // impact freeze length multiplier (0 = off)
 	lingerMs: 1000, // how long damage/heal numbers stay up
@@ -90,6 +91,7 @@ function loadConfig() {
 		hintUses: numParam("Hint Uses", D.hintUses),
 		beatPulse: boolParam("Beat Pulse", D.beatPulse),
 		elementFrame: boolParam("Element Frame", D.elementFrame),
+		uiColors: jsonParam("UI Colors", D.uiColors),
 		freezeScale: numParam("Impact Freeze Scale", D.freezeScale),
 		lingerMs: numParam("Popup Linger", D.lingerMs),
 		defense: {
@@ -114,7 +116,7 @@ function loadConfig() {
 	}
 	cfg.uiScale = Math.max(0.2, cfg.uiScale);
 	if (!SKINS[cfg.skin]) cfg.skin = "classic";
-	applySkin(cfg.skin);
+	applySkin(cfg.skin, cfg.uiColors);
 	return cfg;
 }
 
@@ -193,11 +195,13 @@ const THEMES = {
 	heal:      { accent: "#7dff9a", zone: "#2fa36b", bar: "#12301f", colors: ["#ffffff", "#b8ffcb", "#7dff9a"], wave: "sine",     style: "rise"    },
 	shadow:    { accent: "#c06bff", zone: "#5a2a8a", bar: "#1d1230", colors: ["#7a3fb8", "#c06bff", "#2a1040"], wave: "sawtooth", style: "wisp"    }
 };
-const noirThemes = {}; // cache of the blue/white versions of each theme (noir and moth skins)
 function themeOf(name) {
-	const base = THEMES[name] || THEMES.plain;
-	if (!SK.theme) return base;
-	return noirThemes[SK.name + name] || (noirThemes[SK.name + name] = Object.assign({}, base, SK.theme)); // same motion and sound, blue and white colours
+	const base = THEMES[name] || THEMES.plain, U = SK.userOv || {};
+	if (!SK.theme && !U.accent && !U.zone && !U.bar) return base;
+	if (noirThemes[name]) return noirThemes[name];
+	const t = Object.assign({}, base, SK.theme || {}); // same motion and sound, skin colours
+	if (name === "plain" || !SK.elementsWin) { if (U.accent) t.accent = U.accent; if (U.zone) t.zone = U.zone; if (U.bar) t.bar = U.bar; } // your colours (elements keep theirs unless turned off)
+	return (noirThemes[name] = t);
 }
 
 // ---------------------------------------------------------------- sound (synthesised, no asset files)
@@ -520,24 +524,43 @@ function pixelFlush(target, w, h) {
 const SKINS = {
 	classic: {
 		name: "classic", ink: "#2a2036", paper: "#fffaf0", hl: "#ffffff", grade: ["#9aa3b5", "#8fe388", "#4fc3ff", "#ffb02e", "#ffffff"],
-		hearts: false, star: "#ffd23f", starOff: "#8c849c", starPending: "#e3dcef", starInk: undefined, glow: "#ffd23f", spark: "#ffe27a",
+		hearts: false, icon: "star", bTop: "#2a2036", bFade: null, star: "#ffd23f", starOff: "#8c849c", starPending: "#e3dcef", starInk: undefined, glow: "#ffd23f", spark: "#ffe27a",
 		track: "rgba(60,45,80,0.55)", warn: ["#ff5a5a", "#ffb02e"], confetti: ["#ff5a5a", "#ffb02e", "#ffe27a", "#8fe388", "#4fc3ff", "#c58bff", "#ffffff"], theme: null
 	},
 	moth: { // light panels, outline fading from blue to black, black hearts
 		name: "moth", ink: "#0a2a6b", paper: "#f7f6f2", hl: "#ffffff", grade: ["#6b7280", "#b9d4ff", "#4da3ff", "#8cc2ff", "#ffffff"], grad: true,
-		hearts: true, star: "#000000", starOff: "#9aa0ad", starPending: "#000000", starInk: "#0a2a6b", glow: "#4da3ff", spark: "#ffffff",
+		hearts: true, icon: "heart", bTop: "#1d56c7", bFade: "#000000", star: "#000000", starOff: "#9aa0ad", starPending: "#000000", starInk: "#0a2a6b", glow: "#4da3ff", spark: "#ffffff",
 		track: "rgba(8,16,36,0.85)", warn: ["#ffffff", "#9cc8ff"], confetti: ["#ffffff", "#9cc8ff", "#4da3ff", "#1f6fe0", "#cfe3ff"],
 		theme: { accent: "#4da3ff", zone: "#1f6fe0", bar: "#05080f", colors: ["#ffffff", "#9cc8ff", "#4da3ff"] }
 	},
 	noir: {
 		name: "noir", ink: "#0a2a6b", paper: "#06080f", hl: "#4da3ff", grade: ["#6b7280", "#b9d4ff", "#4da3ff", "#8cc2ff", "#ffffff"],
-		hearts: true, star: "#000000", starOff: "#3a4152", starPending: "#000000", starInk: "#ffffff", glow: "#4da3ff", spark: "#ffffff",
+		hearts: true, icon: "heart", bTop: "#0a2a6b", bFade: null, star: "#000000", starOff: "#3a4152", starPending: "#000000", starInk: "#ffffff", glow: "#4da3ff", spark: "#ffffff",
 		track: "rgba(8,16,36,0.85)", warn: ["#ffffff", "#9cc8ff"], confetti: ["#ffffff", "#9cc8ff", "#4da3ff", "#1f6fe0", "#cfe3ff"],
 		theme: { accent: "#4da3ff", zone: "#1f6fe0", bar: "#05080f", colors: ["#ffffff", "#9cc8ff", "#4da3ff"] }
 	}
 };
-let SK = SKINS.classic, INK = SK.ink, PAPER = SK.paper, GRADE_COLORS = SK.grade;
-function applySkin(name) { SK = SKINS[name] || SKINS.classic; INK = SK.ink; PAPER = SK.paper; GRADE_COLORS = SK.grade; }
+let SK = SKINS.classic, INK = SK.ink, PAPER = SK.paper, PAPER2 = SK.paper, GRADE_COLORS = SK.grade, MARKER = "#ffffff", TEXTKEY = SK.ink, TEXTHINT = "#ffffff";
+const ICONS = ["star", "heart", "circle", "skull", "diamond", "square"];
+let noirThemes = {}; // cache of theme colours after the skin and the user's colours are applied
+// A skin is a preset; "UI Colors" holds only the colours the user changed, so updating the plugin never loses them.
+function applySkin(name, ov) {
+	const base = SKINS[name] || SKINS.classic; ov = ov && typeof ov === "object" ? ov : {};
+	const col = k => (typeof ov[k] === "string" && /^#[0-9a-f]{3,8}$/i.test(ov[k])) ? ov[k] : null;
+	SK = Object.assign({}, base); noirThemes = {};
+	SK.userOv = { accent: col("accent"), zone: col("zone"), bar: col("barBg") };
+	SK.elementsWin = ov.elementsWin !== false;
+	INK = col("border") || base.ink;
+	PAPER = col("panelTop") || base.paper; PAPER2 = col("panelBottom") || PAPER;
+	if (col("border") || col("borderFade")) { SK.customBorder = true; SK.bTop = col("border") || base.bTop; SK.bFade = col("borderFade") || base.bFade; }
+	if (ICONS.indexOf(ov.icon) >= 0) SK.icon = ov.icon;
+	if (col("iconColor")) SK.star = col("iconColor");
+	if (col("iconOutline")) SK.starInk = col("iconOutline");
+	if (col("accent")) SK.glow = col("accent");
+	MARKER = col("marker") || "#ffffff"; TEXTKEY = col("textKey") || INK; TEXTHINT = col("textHint") || "#ffffff";
+	GRADE_COLORS = Array.isArray(ov.grade) && ov.grade.length === 5 && ov.grade.every(c => /^#[0-9a-f]{3,8}$/i.test(c)) ? ov.grade : base.grade;
+	SK.grade = GRADE_COLORS;
+}
 let uiU = 1; // UI unit in pixels (set every frame)
 let beatAt = 0; // last time any tick/note played, drives the beat pulse
 const clamp01 = t => Math.max(0, Math.min(1, t));
@@ -574,8 +597,25 @@ function heartPath(ctx, cx, cy, r) {
 	ctx.bezierCurveTo(cx + s * 0.7, cy - s * 0.95, cx + s * 1.3, cy + s * 0.05, cx, cy + s * 0.85);
 	ctx.closePath();
 }
+// The rating icon (stars by default): hearts, circles, skulls, diamonds or squares.
+function iconPath(ctx, cx, cy, r, shape) {
+	switch (shape) {
+		case "heart": return heartPath(ctx, cx, cy, r);
+		case "circle": ctx.beginPath(); ctx.arc(cx, cy, r * 0.9, 0, Math.PI * 2); ctx.closePath(); return;
+		case "diamond": ctx.beginPath(); ctx.moveTo(cx, cy - r * 1.15); ctx.lineTo(cx + r * 0.85, cy); ctx.lineTo(cx, cy + r * 1.15); ctx.lineTo(cx - r * 0.85, cy); ctx.closePath(); return;
+		case "square": rr(ctx, cx - r * 0.8, cy - r * 0.8, r * 1.6, r * 1.6, r * 0.28); return;
+		case "skull": {
+			ctx.beginPath(); ctx.arc(cx, cy - r * 0.12, r * 0.9, Math.PI * 0.78, Math.PI * 2.22, false);
+			ctx.lineTo(cx + r * 0.5, cy + r * 0.9); ctx.lineTo(cx - r * 0.5, cy + r * 0.9); ctx.closePath();
+			ctx.moveTo(cx - r * 0.13, cy - r * 0.05); ctx.arc(cx - r * 0.33, cy - r * 0.05, r * 0.2, 0, Math.PI * 2, true); // eye holes (wound the other way)
+			ctx.moveTo(cx + r * 0.53, cy - r * 0.05); ctx.arc(cx + r * 0.33, cy - r * 0.05, r * 0.2, 0, Math.PI * 2, true);
+			ctx.moveTo(cx, cy + r * 0.2); ctx.lineTo(cx - r * 0.1, cy + r * 0.42); ctx.lineTo(cx + r * 0.1, cy + r * 0.42); ctx.closePath(); return;
+		}
+		default: return null;
+	}
+}
 function starPath(ctx, cx, cy, ro, ri, n, rot) {
-	if (SK.hearts && n === 5) return heartPath(ctx, cx, cy, ro); // noir skin: hearts instead of five-point stars
+	if (n === 5 && SK.icon && SK.icon !== "star") return iconPath(ctx, cx, cy, ro, SK.icon);
 	ctx.beginPath();
 	for (let i = 0; i < n * 2; i++) {
 		const a = (rot || 0) + i * Math.PI / n - Math.PI / 2, r = i % 2 ? ri : ro;
@@ -604,7 +644,7 @@ function checkMark(ctx, x, y, s, color) {
 // A small themed emblem (flame, bolt, snowflake...) drawn as a sticker.
 function motif(ctx, theme, x, y, s, rot, fill) {
 	ctx.save(); ctx.translate(x, y); ctx.rotate(rot || 0);
-	if (SK.hearts) { heartPath(ctx, 0, 0, s); sticker(ctx, "#000000", Math.max(1.5, s * 0.14), SK.grad ? "#0a2a6b" : "#ffffff"); ctx.restore(); return; }
+	if (SK.hearts) { iconPath(ctx, 0, 0, s, SK.icon === "star" ? "heart" : SK.icon); sticker(ctx, SK.star, Math.max(1.5, s * 0.14), SK.starInk || INK); ctx.restore(); return; }
 	ctx.beginPath();
 	switch (theme) {
 		case "fire":
@@ -734,12 +774,13 @@ function bubble(ctx, c, p, u) {
 	}
 	// outline + paper body
 	body(); ctx.lineWidth = 6 * u;
-		if (fx && !SK.grad) ctx.strokeStyle = mix(T.zone, "#000000", 0.5);
+		if (SK.customBorder) { if (SK.bFade && SK.bFade !== SK.bTop) { const gg = ctx.createLinearGradient(0, y, 0, y + h + 14 * u); gg.addColorStop(0, SK.bTop); gg.addColorStop(1, SK.bFade); ctx.strokeStyle = gg; } else ctx.strokeStyle = SK.bTop; }
+		else if (fx && !SK.grad) ctx.strokeStyle = mix(T.zone, "#000000", 0.5);
 		else if (SK.grad) { const gg = ctx.createLinearGradient(0, y, 0, y + h + 14 * u); gg.addColorStop(0, "#1d56c7"); gg.addColorStop(0.5, "#0a2a6b"); gg.addColorStop(1, "#000000"); ctx.strokeStyle = gg; } else ctx.strokeStyle = INK;
 		ctx.stroke();
 	const g = ctx.createLinearGradient(0, y, 0, y + h);
-	if (fx && !SK.theme) { g.addColorStop(0, mix(PAPER, T.accent, 0.3)); g.addColorStop(1, mix(PAPER, T.accent, 0.78)); } // warm element tint
-	else { g.addColorStop(0, mix(PAPER, T.accent, 0.22)); g.addColorStop(0.35, PAPER); g.addColorStop(1, mix(PAPER, T.accent, 0.10)); }
+	if (fx && !SK.theme) { g.addColorStop(0, mix(PAPER, T.accent, 0.3)); g.addColorStop(1, mix(PAPER2, T.accent, 0.78)); } // warm element tint
+	else { g.addColorStop(0, mix(PAPER, T.accent, 0.22)); g.addColorStop(0.35, PAPER); g.addColorStop(1, mix(PAPER2, T.accent, 0.10)); }
 	body(); ctx.fillStyle = g; ctx.fill();
 	// inner highlight line
 	rr(ctx, x + 5 * u, y + 5 * u, w - 10 * u, h - 10 * u, r - 4 * u);
@@ -795,7 +836,7 @@ function drawKeyCap(ctx, key, cx, cy, s, opt) {
 			ctx.restore(); return;
 		}
 		if (dark) { ctx.lineWidth = s * 0.14; ctx.strokeStyle = INK; ctx.strokeText(label, tx, ty); }
-		ctx.fillStyle = opt.text || INK; ctx.fillText(label, tx, ty);
+		ctx.fillStyle = opt.text || TEXTKEY; ctx.fillText(label, tx, ty);
 	}
 	ctx.restore();
 }
@@ -962,9 +1003,9 @@ class TimingChallenge extends Challenge {
 		if (this.running && this.grade === null) for (let k = 4; k >= 1; k--) {
 			ctx.fillStyle = alpha("#ffffff", 0.07 * (5 - k)); rr(ctx, mx - k * 6 * u - 3 * u, y + 2 * u, 6 * u, bh - 4 * u, 3 * u); ctx.fill();
 		}
-		rr(ctx, mx - 4 * u, y - 5 * u, 8 * u, bh + 10 * u, 4 * u); sticker(ctx, inZ ? T.accent : "#ffffff", 1.8 * u);
+		rr(ctx, mx - 4 * u, y - 5 * u, 8 * u, bh + 10 * u, 4 * u); sticker(ctx, inZ ? T.accent : MARKER, 1.8 * u);
 		ctx.beginPath(); ctx.moveTo(mx - 8 * u, y - 18 * u); ctx.lineTo(mx + 8 * u, y - 18 * u); ctx.lineTo(mx, y - 6 * u); ctx.closePath();
-		sticker(ctx, inZ ? T.accent : "#ffffff", 1.6 * u);
+		sticker(ctx, inZ ? T.accent : MARKER, 1.6 * u);
 		return "ENTER IN THE ZONE!";
 	}
 }
@@ -1004,7 +1045,7 @@ class RingChallenge extends Challenge {
 			ctx.save();
 			if (near) { ctx.shadowColor = T.accent; ctx.shadowBlur = 16 * u; }
 			ctx.beginPath(); ctx.arc(cx, cy, r, 0, Math.PI * 2); ctx.lineWidth = 12 * u; ctx.strokeStyle = INK; ctx.stroke();
-			ctx.lineWidth = 6.5 * u; ctx.strokeStyle = near ? T.accent : "#ffffff"; ctx.stroke();
+			ctx.lineWidth = 6.5 * u; ctx.strokeStyle = near ? T.accent : MARKER; ctx.stroke();
 			ctx.restore();
 			for (let i = 0; i < 6; i++) {
 				const a = now * 2.2 + i * Math.PI / 3;
@@ -1195,7 +1236,7 @@ class HoldChallenge extends Challenge {
 			const fg = ctx.createLinearGradient(0, y, 0, y + bh); fg.addColorStop(0, "rgba(255,255,255,0.85)"); fg.addColorStop(1, alpha(T.accent, 0.55));
 			ctx.fillStyle = fg; ctx.fillRect(x, y, bw, bh);
 			ctx.restore();
-			const ex = x + bw * this.gauge; rr(ctx, ex - 3.5 * u, y - 4 * u, 7 * u, bh + 8 * u, 3.5 * u); sticker(ctx, inZ ? T.accent : "#ffffff", 1.6 * u);
+			const ex = x + bw * this.gauge; rr(ctx, ex - 3.5 * u, y - 4 * u, 7 * u, bh + 8 * u, 3.5 * u); sticker(ctx, inZ ? T.accent : MARKER, 1.6 * u);
 		}
 		const bob = Math.sin(now * 5) * 2.5 * u, sk = inZ ? 1.25 : 1;
 		starPath(ctx, cx, y - 12 * u + bob, 10 * u * sk, 4.4 * u * sk, 5, now * 0.9); sticker(ctx, SK.star, 1.6 * u, SK.starInk);
@@ -1321,7 +1362,7 @@ class ComboChallenge extends Challenge {
 			const r = Math.max(2, r0 * this.ratioOf(c));
 			ctx.save(); if (near) { ctx.shadowColor = T.accent; ctx.shadowBlur = 14 * u; }
 			ctx.beginPath(); ctx.arc(cx, cy, r, 0, Math.PI * 2); ctx.lineWidth = 11 * u; ctx.strokeStyle = INK; ctx.stroke();
-			ctx.lineWidth = 6 * u; ctx.strokeStyle = near ? T.accent : "#ffffff"; ctx.stroke(); ctx.restore();
+			ctx.lineWidth = 6 * u; ctx.strokeStyle = near ? T.accent : MARKER; ctx.stroke(); ctx.restore();
 		}
 		const pip = 17 * u, gp = 16 * u, total = this.count * (pip * 2 + gp) - gp, p = place(this, w, h, u, total, pip * 2.2); bubble(ctx, this, p, u);
 		for (let i = 0; i < this.count; i++) {
@@ -1346,7 +1387,7 @@ class CrosshairChallenge extends RingChallenge {
 			ctx.save(); ctx.lineCap = "round";
 			if (near) { ctx.shadowColor = T.accent; ctx.shadowBlur = 16 * u; }
 			ctx.translate(cx, cy);
-			for (const [wd, col] of [[11 * u, INK], [5.5 * u, near ? T.accent : "#ffffff"]]) {
+			for (const [wd, col] of [[11 * u, INK], [5.5 * u, near ? T.accent : MARKER]]) {
 				ctx.lineWidth = wd; ctx.strokeStyle = col;
 				ctx.beginPath(); ctx.arc(0, 0, r, 0, Math.PI * 2); ctx.stroke();
 				ctx.beginPath();
@@ -2064,7 +2105,7 @@ function renderOverlay(ctx, c, w, h) {
 		ctx.font = "900 " + 15 * u + "px 'Trebuchet MS','Arial Black',sans-serif";
 		ctx.lineJoin = "round"; ctx.lineWidth = 5 * u; ctx.strokeStyle = INK;
 		const hy = p.top - 34 * u;
-		ctx.strokeText(hint, p.x, hy); ctx.fillStyle = "#ffffff"; ctx.fillText(hint, p.x, hy);
+		ctx.strokeText(hint, p.x, hy); ctx.fillStyle = TEXTHINT; ctx.fillText(hint, p.x, hy);
 		ctx.globalAlpha = 1;
 	}
 	if (c.grade !== null) {

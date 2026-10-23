@@ -31,6 +31,7 @@ MIT (c) Wood (Skinnywoodplank). See LICENSE.
 
 ## Changelog
 
+- 1.2.8 New Colors tab in the Tester: pick your own colours (panel, border with fade, bar, zone, marker, accent, icon, text, hit grades) and the rating icon (star, heart, circle, skull, diamond, square). Presets fill the colours; only your changes are saved in the new "UI Colors" setting, so updates keep them.
 - 1.2.7 Element Frame: lightning gets crackling arcs and flying sparks; light gets a sweeping lens flare with rays and ghost discs.
 - 1.2.6 New "Element Frame" setting (on by default): elemental attacks tint the prompt panel and add a pulsing glow, a crawling dashed edge and drifting embers (fire) or flakes (ice, water, earth).
 - 1.2.5 Tester: fixes "Cannot read properties of undefined (reading 'k')" when opening some projects. Default character and class minigames are built in, so Reset all restores them.

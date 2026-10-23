@@ -36,6 +36,7 @@ Open Plugins > Quick Time Battle to edit these.
 - **Hint Uses** - the text hint above a prompt fades after this many uses of each challenge type. 0 = never show.
 - **Beat Pulse** - the prompt bubble pulses with each tick sound.
 - **Element Frame** - elemental attacks tint the prompt panel and add a pulsing glow, a crawling dashed edge and drifting embers (fire) or flakes (ice, water, earth).  Lightning adds crackling arcs and sparks; light adds a lens flare. Off = plain panels.
+- **UI Colors** - your own colour changes on top of the UI Theme (JSON). Use the Tester's Colors tab: panel, border and fade, bar, zone, marker, accent, rating icon (star, heart, circle, skull, diamond, square), icon and text colours, hit grades. {} = the theme as is.
 - **Impact Freeze Scale** - length of the freeze on the slash frame. 0 = off, 2 = double.
 - **Effects Scale** - size of particles and bursts.
 - **Sound** - synthesized sounds on or off.
