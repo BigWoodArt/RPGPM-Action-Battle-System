@@ -31,6 +31,7 @@ MIT (c) Wood (Skinnywoodplank). See LICENSE.
 
 ## Changelog
 
+- 1.2.2 Tester: shows errors when opening a folder; uses built-in defaults if details.json is missing.
 - 1.2.1 New "moth" UI Theme: off-white panels, outline fading from blue to black, black hearts. Classic and noir unchanged.
 - 1.2.0 New UI Theme setting: classic or noir (black and white, blue accents, dark blue outline, black hearts). Works with pixel or polished style. Existing settings keep working.
 - 1.1.0 New Greenlight minigame. Mash is easier (8 presses, Perfect at 1.6x). Dodge window default 12 frames. Ranged Character checkbox. Tester: More menu, grouped Skills list. Saved settings keep working.
