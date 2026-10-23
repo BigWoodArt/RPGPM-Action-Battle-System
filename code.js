@@ -1,4 +1,4 @@
-// Quick Time Battle v1.2.5 - RPG Paper Maker 3.0 plugin.
+// Quick Time Battle v1.2.6 - RPG Paper Maker 3.0 plugin.
 // Hero attacks and skills run a WASD + Enter quick-time challenge; the grade scales damage.
 // Press any key just before an enemy hit lands to dodge it. See FULL_INSTRUCTIONS.md.
 // Plugins run through `new Function(...)`: no imports. Globals: Common, Core, Data, Manager, Model, Scene.
@@ -39,6 +39,7 @@ const DEFAULT_CONFIG = Object.assign({
 	overhead: true, // prompts float above the active hero
 	hintUses: 4, // text hints fade out after this many uses of each challenge type
 	beatPulse: true,
+	elementFrame: true, // elemental attacks: tinted panel, glow and drifting embers/flakes around the prompt
 	freezeScale: 1, // impact freeze length multiplier (0 = off)
 	lingerMs: 1000, // how long damage/heal numbers stay up
 	defense: { enabled: true, windowFrames: 12, cooldown: 0.6, slide: 1, duration: 0.45, keys: ["W", "A", "S", "D", "ENTER"] }
@@ -88,6 +89,7 @@ function loadConfig() {
 		overhead: boolParam("Prompts Over Head", D.overhead),
 		hintUses: numParam("Hint Uses", D.hintUses),
 		beatPulse: boolParam("Beat Pulse", D.beatPulse),
+		elementFrame: boolParam("Element Frame", D.elementFrame),
 		freezeScale: numParam("Impact Freeze Scale", D.freezeScale),
 		lingerMs: numParam("Popup Linger", D.lingerMs),
 		defense: {
@@ -658,6 +660,20 @@ function place(c, w, h, u, pw, ph) {
 	return c.panel;
 }
 
+// Element frame extras: a fuse-like dashed edge crawling round the bubble and embers (rise) or flakes (fall) drifting by.
+function fxHash(i) { const v = Math.sin(i * 127.1 + 311.7) * 43758.5453; return v - Math.floor(v); }
+function elementFx(ctx, T, x, y, w, h, u, t) {
+	ctx.save();
+	rr(ctx, x, y, w, h, 16 * u); ctx.lineWidth = 2 * u; ctx.setLineDash([14 * u, 10 * u]); ctx.lineDashOffset = -t * 90 * u; ctx.strokeStyle = alpha(T.colors[1] || T.accent, 0.9); ctx.stroke(); ctx.setLineDash([]);
+	const fall = T.style === "fall";
+	for (let i = 0; i < 16; i++) {
+		const sp = 0.5 + fxHash(i) * 0.6, ph = (t * sp + fxHash(i + 5)) % 1, px = x + 6 * u + fxHash(i + 1) * (w - 12 * u) + Math.sin(t * 4 + i) * 6 * u;
+		const py = fall ? y - 42 * u + ph * (h * 0.5 + 42 * u) : y + 10 * u - ph * 70 * u, r = (3.2 * (1 - ph) + 0.8) * u;
+		ctx.globalAlpha = Math.max(0, 1 - ph); ctx.beginPath(); ctx.arc(px, py, r, 0, Math.PI * 2); ctx.fillStyle = T.colors[(ph < 0.5 ? 1 : 0) % T.colors.length] || T.accent; ctx.fill();
+	}
+	ctx.restore();
+}
+
 // Paper speech bubble with a tail pointing at the hero, themed corner stickers and a beat-pulse glow.
 function bubble(ctx, c, p, u) {
 	const T = c.T, pad = 15 * u, r = 16 * u;
@@ -675,12 +691,20 @@ function bubble(ctx, c, p, u) {
 	if (c.beat > 0) {
 		body(); ctx.lineWidth = (6 + 10 * c.beat) * u; ctx.strokeStyle = alpha(T.accent, 0.18 + 0.5 * c.beat); ctx.stroke();
 	}
+	// element frame: pulsing heat glow behind the bubble
+	const fx = CONFIG.elementFrame && c.themeName && c.themeName !== "plain", ft = performance.now() / 1000;
+	if (fx) {
+		const gl = 0.55 + 0.35 * Math.sin(ft * 9) * Math.sin(ft * 4.3);
+		ctx.save(); body(); ctx.shadowColor = alpha(T.accent, 0.9); ctx.shadowBlur = 22 * u; ctx.lineWidth = 8 * u; ctx.strokeStyle = alpha(T.accent, 0.55 * gl); ctx.stroke(); ctx.restore();
+	}
 	// outline + paper body
 	body(); ctx.lineWidth = 6 * u;
-		if (SK.grad) { const gg = ctx.createLinearGradient(0, y, 0, y + h + 14 * u); gg.addColorStop(0, "#1d56c7"); gg.addColorStop(0.5, "#0a2a6b"); gg.addColorStop(1, "#000000"); ctx.strokeStyle = gg; } else ctx.strokeStyle = INK;
+		if (fx && !SK.grad) ctx.strokeStyle = mix(T.zone, "#000000", 0.5);
+		else if (SK.grad) { const gg = ctx.createLinearGradient(0, y, 0, y + h + 14 * u); gg.addColorStop(0, "#1d56c7"); gg.addColorStop(0.5, "#0a2a6b"); gg.addColorStop(1, "#000000"); ctx.strokeStyle = gg; } else ctx.strokeStyle = INK;
 		ctx.stroke();
 	const g = ctx.createLinearGradient(0, y, 0, y + h);
-	g.addColorStop(0, mix(PAPER, T.accent, 0.22)); g.addColorStop(0.35, PAPER); g.addColorStop(1, mix(PAPER, T.accent, 0.10));
+	if (fx && !SK.theme) { g.addColorStop(0, mix(PAPER, T.accent, 0.3)); g.addColorStop(1, mix(PAPER, T.accent, 0.78)); } // warm element tint
+	else { g.addColorStop(0, mix(PAPER, T.accent, 0.22)); g.addColorStop(0.35, PAPER); g.addColorStop(1, mix(PAPER, T.accent, 0.10)); }
 	body(); ctx.fillStyle = g; ctx.fill();
 	// inner highlight line
 	rr(ctx, x + 5 * u, y + 5 * u, w - 10 * u, h - 10 * u, r - 4 * u);
@@ -688,6 +712,7 @@ function bubble(ctx, c, p, u) {
 	// themed corner stickers
 	motif(ctx, c.themeName, x + 8 * u, y + 4 * u, 13 * u, -0.35, T.accent);
 	motif(ctx, c.themeName, x + w - 8 * u, y + 4 * u, 13 * u, 0.35, T.accent);
+	if (fx) elementFx(ctx, T, x, y, w, h, u, ft);
 	ctx.restore();
 }
 

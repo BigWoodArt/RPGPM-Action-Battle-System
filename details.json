@@ -1,7 +1,7 @@
 {
 	"name": "Quick Time Battle",
 	"description": "Timed WASD + Enter challenges on hero attacks scale damage; press a key before an enemy hit to dodge it.",
-	"version": "1.2.5",
+	"version": "1.2.6",
 	"tutorial": "https://bigwoodart.github.io/RPGPM-Action-Battle-System/Tester.html",
 	"defaultParameters": [
 		{
@@ -74,6 +74,15 @@
 			"defaultValue": {
 				"k": 8,
 				"v": "pixel"
+			}
+		},
+		{
+			"id": -1,
+			"name": "Element Frame",
+			"description": "Elemental attacks tint the prompt panel and add a pulsing glow, a crawling dashed edge and drifting embers (fire) or flakes (ice, water, earth). Off: plain panels.",
+			"defaultValue": {
+				"k": 10,
+				"v": true
 			}
 		},
 		{
@@ -436,6 +445,15 @@
 			"defaultValue": {
 				"k": 8,
 				"v": "pixel"
+			}
+		},
+		{
+			"id": -1,
+			"name": "Element Frame",
+			"description": "Elemental attacks tint the prompt panel and add a pulsing glow, a crawling dashed edge and drifting embers (fire) or flakes (ice, water, earth). Off: plain panels.",
+			"defaultValue": {
+				"k": 10,
+				"v": true
 			}
 		},
 		{

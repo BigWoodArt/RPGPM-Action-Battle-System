@@ -35,6 +35,7 @@ Open Plugins > Quick Time Battle to edit these.
 - **Prompts Over Head** - prompts float above the active hero. Off: mid-screen.
 - **Hint Uses** - the text hint above a prompt fades after this many uses of each challenge type. 0 = never show.
 - **Beat Pulse** - the prompt bubble pulses with each tick sound.
+- **Element Frame** - elemental attacks tint the prompt panel and add a pulsing glow, a crawling dashed edge and drifting embers (fire) or flakes (ice, water, earth). Off = plain panels.
 - **Impact Freeze Scale** - length of the freeze on the slash frame. 0 = off, 2 = double.
 - **Effects Scale** - size of particles and bursts.
 - **Sound** - synthesized sounds on or off.
