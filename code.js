@@ -1,4 +1,4 @@
-// Quick Time Battle v1.2.0 - RPG Paper Maker 3.0 plugin.
+// Quick Time Battle v1.2.1 - RPG Paper Maker 3.0 plugin.
 // Hero attacks and skills run a WASD + Enter quick-time challenge; the grade scales damage.
 // Press any key just before an enemy hit lands to dodge it. See FULL_INSTRUCTIONS.md.
 // Plugins run through `new Function(...)`: no imports. Globals: Common, Core, Data, Manager, Model, Scene.
@@ -191,11 +191,11 @@ const THEMES = {
 	heal:      { accent: "#7dff9a", zone: "#2fa36b", bar: "#12301f", colors: ["#ffffff", "#b8ffcb", "#7dff9a"], wave: "sine",     style: "rise"    },
 	shadow:    { accent: "#c06bff", zone: "#5a2a8a", bar: "#1d1230", colors: ["#7a3fb8", "#c06bff", "#2a1040"], wave: "sawtooth", style: "wisp"    }
 };
-const noirThemes = {};
+const noirThemes = {}; // cache of the blue/white versions of each theme (noir and moth skins)
 function themeOf(name) {
 	const base = THEMES[name] || THEMES.plain;
-	if (SK.name !== "noir") return base;
-	return noirThemes[name] || (noirThemes[name] = Object.assign({}, base, SK.theme)); // same motion and sound, blue and white colours
+	if (!SK.theme) return base;
+	return noirThemes[SK.name + name] || (noirThemes[SK.name + name] = Object.assign({}, base, SK.theme)); // same motion and sound, blue and white colours
 }
 
 // ---------------------------------------------------------------- sound (synthesised, no asset files)
@@ -513,12 +513,19 @@ function pixelFlush(target, w, h) {
 
 // ---------------------------------------------------------------- ui kit (everything is drawn from shapes: no art files)
 // Look: paper-cutout stickers with a dark ink outline, springy pop-ins, themed motifs, confetti for big hits.
-// Colour skins. "classic" is the original look. "noir" is black and white with blue accents, a dark blue outline and black hearts.
+// Colour skins. "classic" is the original look. "noir" is dark: black and white with blue accents, a dark blue outline and black hearts.
+// "moth" is the light version: off-white panels, an outline fading from blue to black, black hearts.
 const SKINS = {
 	classic: {
 		name: "classic", ink: "#2a2036", paper: "#fffaf0", hl: "#ffffff", grade: ["#9aa3b5", "#8fe388", "#4fc3ff", "#ffb02e", "#ffffff"],
 		hearts: false, star: "#ffd23f", starOff: "#8c849c", starPending: "#e3dcef", starInk: undefined, glow: "#ffd23f", spark: "#ffe27a",
 		track: "rgba(60,45,80,0.55)", warn: ["#ff5a5a", "#ffb02e"], confetti: ["#ff5a5a", "#ffb02e", "#ffe27a", "#8fe388", "#4fc3ff", "#c58bff", "#ffffff"], theme: null
+	},
+	moth: { // light panels, outline fading from blue to black, black hearts
+		name: "moth", ink: "#0a2a6b", paper: "#f7f6f2", hl: "#ffffff", grade: ["#6b7280", "#b9d4ff", "#4da3ff", "#8cc2ff", "#ffffff"], grad: true,
+		hearts: true, star: "#000000", starOff: "#9aa0ad", starPending: "#000000", starInk: "#0a2a6b", glow: "#4da3ff", spark: "#ffffff",
+		track: "rgba(8,16,36,0.85)", warn: ["#ffffff", "#9cc8ff"], confetti: ["#ffffff", "#9cc8ff", "#4da3ff", "#1f6fe0", "#cfe3ff"],
+		theme: { accent: "#4da3ff", zone: "#1f6fe0", bar: "#05080f", colors: ["#ffffff", "#9cc8ff", "#4da3ff"] }
 	},
 	noir: {
 		name: "noir", ink: "#0a2a6b", paper: "#06080f", hl: "#4da3ff", grade: ["#6b7280", "#b9d4ff", "#4da3ff", "#8cc2ff", "#ffffff"],
@@ -595,7 +602,7 @@ function checkMark(ctx, x, y, s, color) {
 // A small themed emblem (flame, bolt, snowflake...) drawn as a sticker.
 function motif(ctx, theme, x, y, s, rot, fill) {
 	ctx.save(); ctx.translate(x, y); ctx.rotate(rot || 0);
-	if (SK.hearts) { heartPath(ctx, 0, 0, s); sticker(ctx, "#000000", Math.max(1.5, s * 0.14), "#ffffff"); ctx.restore(); return; }
+	if (SK.hearts) { heartPath(ctx, 0, 0, s); sticker(ctx, "#000000", Math.max(1.5, s * 0.14), SK.grad ? "#0a2a6b" : "#ffffff"); ctx.restore(); return; }
 	ctx.beginPath();
 	switch (theme) {
 		case "fire":
@@ -669,7 +676,9 @@ function bubble(ctx, c, p, u) {
 		body(); ctx.lineWidth = (6 + 10 * c.beat) * u; ctx.strokeStyle = alpha(T.accent, 0.18 + 0.5 * c.beat); ctx.stroke();
 	}
 	// outline + paper body
-	body(); ctx.lineWidth = 6 * u; ctx.strokeStyle = INK; ctx.stroke();
+	body(); ctx.lineWidth = 6 * u;
+		if (SK.grad) { const gg = ctx.createLinearGradient(0, y, 0, y + h + 14 * u); gg.addColorStop(0, "#1d56c7"); gg.addColorStop(0.5, "#0a2a6b"); gg.addColorStop(1, "#000000"); ctx.strokeStyle = gg; } else ctx.strokeStyle = INK;
+		ctx.stroke();
 	const g = ctx.createLinearGradient(0, y, 0, y + h);
 	g.addColorStop(0, mix(PAPER, T.accent, 0.22)); g.addColorStop(0.35, PAPER); g.addColorStop(1, mix(PAPER, T.accent, 0.10));
 	body(); ctx.fillStyle = g; ctx.fill();
