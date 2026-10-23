@@ -31,6 +31,7 @@ MIT (c) Wood (Skinnywoodplank). See LICENSE.
 
 ## Changelog
 
+- 1.2.5 Tester: fixes "Cannot read properties of undefined (reading 'k')" when opening some projects. Default character and class minigames are built in, so Reset all restores them.
 - 1.2.4 Tester: the window's X button closes it even with unsaved changes.
 - 1.2.3 Tester window opens centered on screen.
 - 1.2.2 Tester: shows errors when opening a folder; uses built-in defaults if details.json is missing.
