@@ -1,4 +1,4 @@
-// Quick Time Battle v1.2.6 - RPG Paper Maker 3.0 plugin.
+// Quick Time Battle v1.2.7 - RPG Paper Maker 3.0 plugin.
 // Hero attacks and skills run a WASD + Enter quick-time challenge; the grade scales damage.
 // Press any key just before an enemy hit lands to dodge it. See FULL_INSTRUCTIONS.md.
 // Plugins run through `new Function(...)`: no imports. Globals: Common, Core, Data, Manager, Model, Scene.
@@ -662,8 +662,43 @@ function place(c, w, h, u, pw, ph) {
 
 // Element frame extras: a fuse-like dashed edge crawling round the bubble and embers (rise) or flakes (fall) drifting by.
 function fxHash(i) { const v = Math.sin(i * 127.1 + 311.7) * 43758.5453; return v - Math.floor(v); }
-function elementFx(ctx, T, x, y, w, h, u, t) {
+function elementFx(ctx, T, x, y, w, h, u, t, name) {
 	ctx.save();
+	if (name === "lightning") { // crackling arcs jumping off the edge, plus flying sparks
+		const step = Math.floor(t * 10), cx = x + w / 2, cy = y + h / 2;
+		ctx.lineCap = "round"; ctx.lineJoin = "round"; ctx.shadowColor = T.accent; ctx.shadowBlur = 10 * u;
+		for (let k = 0; k < 4; k++) {
+			const sd = step * 7 + k * 13, side = Math.floor(fxHash(sd) * 4), f = 0.08 + fxHash(sd + 1) * 0.84;
+			let px = side < 2 ? x + f * w : (side === 2 ? x : x + w), py = side === 0 ? y : side === 1 ? y + h : y + f * h;
+			const dx = side < 2 ? 0 : (side === 2 ? -1 : 1), dy = side === 0 ? -1 : side === 1 ? 1 : 0;
+			ctx.beginPath(); ctx.moveTo(px, py);
+			for (let j = 1; j <= 4; j++) { px += (dx * 6 + (fxHash(sd + j * 3) - 0.5) * 14 * (dx ? 0.5 : 1.4)) * u; py += (dy * 6 + (fxHash(sd + j * 5) - 0.5) * 14 * (dy ? 0.5 : 1.4)) * u; ctx.lineTo(px, py); }
+			ctx.globalAlpha = 0.95; ctx.lineWidth = 4.4 * u; ctx.strokeStyle = T.zone; ctx.stroke(); ctx.lineWidth = 1.8 * u; ctx.strokeStyle = "#ffffff"; ctx.stroke();
+		}
+		ctx.shadowBlur = 0;
+		for (let i = 0; i < 10; i++) {
+			const sp = 1.2 + fxHash(i) * 1.2, ph = (t * sp + fxHash(i + 5)) % 1, ang = fxHash(i + 2) * Math.PI * 2;
+			const ex = x + fxHash(i + 1) * w, ey = y + (i % 2 ? h : 0), d = ph * 26 * u, vx = Math.cos(ang), vy = Math.abs(Math.sin(ang)) * (i % 2 ? 1 : -1);
+			ctx.globalAlpha = 1 - ph; ctx.beginPath(); ctx.moveTo(ex + vx * d, ey + vy * d); ctx.lineTo(ex + vx * (d + 5 * u), ey + vy * (d + 5 * u));
+			ctx.lineWidth = 1.8 * u; ctx.strokeStyle = i % 2 ? "#ffffff" : T.accent; ctx.stroke();
+		}
+		ctx.restore(); return;
+	}
+	if (name === "light") { // a lens flare sweeping across the bubble: bloom, streaks, rays and ghost discs
+		const sweep = (t * 0.28) % 1.5 - 0.25, fx0 = x + sweep * w, fy0 = y + h * 0.18, cx = x + w / 2, cy = y + h / 2;
+		const vis = Math.max(0, Math.min(1, 1 - Math.abs(sweep - 0.5) * 1.3)) * (0.75 + 0.25 * Math.sin(t * 11));
+		ctx.globalCompositeOperation = "lighter"; ctx.globalAlpha = vis;
+		const R = 34 * u, gr = ctx.createRadialGradient(fx0, fy0, 0, fx0, fy0, R); gr.addColorStop(0, "rgba(255,255,255,0.95)"); gr.addColorStop(0.25, alpha(T.accent, 0.7)); gr.addColorStop(1, "rgba(255,230,140,0)");
+		ctx.fillStyle = gr; ctx.beginPath(); ctx.arc(fx0, fy0, R, 0, Math.PI * 2); ctx.fill();
+		const hs = ctx.createLinearGradient(fx0 - 70 * u, 0, fx0 + 70 * u, 0); hs.addColorStop(0, "rgba(255,240,170,0)"); hs.addColorStop(0.5, "rgba(255,255,255,0.9)"); hs.addColorStop(1, "rgba(255,240,170,0)");
+		ctx.fillStyle = hs; ctx.fillRect(fx0 - 70 * u, fy0 - 1.2 * u, 140 * u, 2.4 * u);
+		ctx.strokeStyle = "rgba(255,255,255,0.8)"; ctx.lineWidth = 1.4 * u; ctx.lineCap = "round";
+		for (let k = 0; k < 8; k++) { const a = k * Math.PI / 4 + t * 0.4, l = (k % 2 ? 14 : 24) * u; ctx.beginPath(); ctx.moveTo(fx0, fy0); ctx.lineTo(fx0 + Math.cos(a) * l, fy0 + Math.sin(a) * l); ctx.stroke(); }
+		for (let k = 1; k <= 4; k++) { const f = k * 0.34, gx = fx0 + (cx - fx0) * f * 1.6, gy = fy0 + (cy - fy0) * f * 1.6, gr2 = (5 + k * 3) * u; ctx.globalAlpha = vis * 0.28; ctx.beginPath(); ctx.arc(gx, gy, gr2, 0, Math.PI * 2); ctx.fillStyle = k % 2 ? T.accent : "#ffffff"; ctx.fill(); ctx.lineWidth = 1.2 * u; ctx.strokeStyle = "#ffffff"; ctx.stroke(); }
+		ctx.globalAlpha = 1; ctx.globalCompositeOperation = "source-over";
+		for (let i = 0; i < 6; i++) { const ph = (t * 0.9 + fxHash(i)) % 1, px = x + fxHash(i + 1) * w, py = y + fxHash(i + 2) * h, sz = Math.sin(ph * Math.PI) * 5 * u; sparkle(ctx, px, py, sz, 0, "#ffffff", true); }
+		ctx.restore(); return;
+	}
 	rr(ctx, x, y, w, h, 16 * u); ctx.lineWidth = 2 * u; ctx.setLineDash([14 * u, 10 * u]); ctx.lineDashOffset = -t * 90 * u; ctx.strokeStyle = alpha(T.colors[1] || T.accent, 0.9); ctx.stroke(); ctx.setLineDash([]);
 	const fall = T.style === "fall";
 	for (let i = 0; i < 16; i++) {
@@ -712,7 +747,7 @@ function bubble(ctx, c, p, u) {
 	// themed corner stickers
 	motif(ctx, c.themeName, x + 8 * u, y + 4 * u, 13 * u, -0.35, T.accent);
 	motif(ctx, c.themeName, x + w - 8 * u, y + 4 * u, 13 * u, 0.35, T.accent);
-	if (fx) elementFx(ctx, T, x, y, w, h, u, ft);
+	if (fx) elementFx(ctx, T, x, y, w, h, u, ft, c.themeName);
 	ctx.restore();
 }
 
